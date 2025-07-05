@@ -10,6 +10,7 @@ use tempfile::{tempdir, TempDir};
 // but we still need to manage the TempDir.
 // We'll manage it inside the command and rely on RAII to clean it up when the app closes,
 // though for a more robust app we might want a more sophisticated cleanup strategy.
+#[allow(dead_code)]
 static TEMP_DIR_HANDLE: Mutex<Option<TempDir>> = Mutex::new(None);
 
 #[derive(serde::Serialize, Clone)]
