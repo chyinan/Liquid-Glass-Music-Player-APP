@@ -120,6 +120,19 @@ document.addEventListener('DOMContentLoaded', () => {
         applyAdaptiveColors({ text: '#f0f0f0' });
     }
 
+    /**
+     * 将秒数格式化为 mm:ss 字符串
+     * @param {number} seconds
+     * @returns {string}
+     */
+    function formatTime(seconds) {
+        if (isNaN(seconds) || !isFinite(seconds)) return '00:00';
+        const floorSeconds = Math.floor(seconds);
+        const min = Math.floor(floorSeconds / 60);
+        const sec = floorSeconds % 60;
+        return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    }
+
     // === Event Listeners for Audio Player ===
     audio.addEventListener('loadedmetadata', () => {
         durationEl.textContent = formatTime(audio.duration);
