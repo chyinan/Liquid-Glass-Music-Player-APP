@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-process-audio-file"
+description = "Allows invoking the process_audio_file command"
+commands.allow = ["process_audio_file"] 

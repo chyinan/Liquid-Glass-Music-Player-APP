@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default permissions for the application.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "dialog:default",
+    "allow-process-audio-file",
+    "fs:default",
+    "allow-read-all-files",
+    "fs:allow-temp-read-recursive"
+  ]
+}

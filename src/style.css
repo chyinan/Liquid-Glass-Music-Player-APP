@@ -1,0 +1,612 @@
+/* 
+=== GPU硬件加速优化说明 ===
+本CSS已针对GPU性能进行优化：
+1. 所有动画元素都使用will-change属性预告变化
+2. translateZ()强制创建独立复合层，避免重绘
+3. backface-visibility: hidden 优化3D性能
+4. 使用transform属性而非位置属性进行动画
+5. 每个复合层使用唯一的translateZ值避免层合并
+
+性能监控：
+- 建议使用Chrome DevTools的Layers面板检查复合层
+- 建议使用Performance面板监控60FPS渲染性能
+- 低端设备可考虑降低动画复杂度
+*/
+
+/* --- Basic Setup --- */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-text-color: #f0f0f0;
+    --secondary-text-color: #b0b0b0;
+    --accent-color: #fff;
+    --background-color: #000;
+    --adaptive-text-color: #f0f0f0; /* 自适应文字颜色 */
+    --adaptive-progress-bg: rgba(255, 255, 255, 0.2); /* 自适应进度条背景 */
+    --adaptive-progress-fill: #ffffff; /* 自适应进度条填充颜色 */
+}
+
+body {
+    background-color: var(--background-color);
+    color: var(--primary-text-color);
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+/* --- Blurred Background --- */
+#background-blur {
+    position: fixed;
+    top: -30px;
+    left: -30px;
+    right: -30px;
+    bottom: -30px;
+    background-size: 120% 120%; /* 稍微放大以便流动 */
+    background-position: center;
+    filter: blur(50px) brightness(0.7);
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+    
+    /* GPU硬件加速优化 */
+    will-change: transform, background-position, opacity;
+    transform: translateZ(0.003px); /* 独立的复合层ID */
+    backface-visibility: hidden;
+    
+    /* 添加更慢的背景流动效果 */
+    animation: slowBackgroundFlow 120s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+#background-blur.active {
+    opacity: 1;
+}
+
+/* --- Main Container --- */
+.container {
+    width: 100%;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* GPU优化 */
+    will-change: transform;
+    transform: translateZ(0.005px); /* 为容器创建复合层 */
+    backface-visibility: hidden;
+}
+
+/* --- Minimal Mode Container Override --- */
+.container:has(#player-ui-glass.minimal-mode) {
+    max-width: 98vw; /* Allow more width for minimal mode */
+    width: 98vw; /* Full viewport width */
+}
+
+/* Backup for browsers that don't support :has() */
+.container.minimal-active {
+    max-width: 98vw !important;
+    width: 98vw !important;
+}
+
+/* --- Initial File Upload Screen --- */
+.file-select-container {
+    text-align: center;
+    padding: 2rem;
+    background: rgba(10, 10, 10, 0.5);
+    border-radius: 16px;
+}
+
+.file-select-container h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.file-select-container p { color: var(--secondary-text-color); font-size: 1.1rem; margin-bottom: 2rem; }
+input[type="file"] { display: none; }
+
+.custom-file-upload {
+    background-color: var(--accent-color);
+    color: var(--background-color);
+    padding: 1rem 2rem;
+    border-radius: 30px;
+    cursor: pointer;
+    font-weight: bold;
+    display: inline-block;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.custom-file-upload:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
+}
+
+/* --- NEW SVG-based Liquid Glass Effect --- */
+#player-wrapper {
+    position: relative;
+    width: 90%;
+    max-width: 450px;
+    border-radius: 24px;
+    overflow: hidden;
+    
+    /* GPU优化 */
+    will-change: transform;
+    transform: translateZ(0.006px); /* 为wrapper创建复合层 */
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+/* Override wrapper constraints in minimal mode */
+#player-wrapper:has(#player-ui-glass.minimal-mode) {
+    max-width: none;
+    width: auto;
+}
+
+/* Backup for browsers that don't support :has() */
+#player-wrapper.minimal-active {
+    max-width: none !important;
+    width: auto !important;
+}
+
+#player-ui-distorted-bg {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    background-size: cover; /* 保持原始比例 */
+    background-position: center;
+    border-radius: 20px; /* 进一步减少圆角半径，确保完全被24px圆角覆盖 */
+    filter: url(#liquid-distortion);
+    z-index: 1;
+    
+    /* GPU硬件加速优化 */
+    will-change: transform, background-position;
+    transform: translateZ(0.001px); /* 强制创建复合层，避免重绘 */
+    backface-visibility: hidden; /* 隐藏元素背面，优化3D性能 */
+    perspective: 1000px; /* 启用3D渲染上下文 */
+    
+    /* 添加流动动画 */
+    animation: flowingBackground 65s cubic-bezier(0.4, 0.0, 0.6, 1.0) infinite;
+}
+
+/* --- Liquid Glass Player UI (Adjusted) --- */
+#player-ui-glass {
+    position: relative;
+    z-index: 2;
+    width: 100%; /* Changed to fill the wrapper */
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    backdrop-filter: blur(14px) saturate(1.8);
+    -webkit-backdrop-filter: blur(14px) saturate(1.8);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 2rem 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    text-align: center;
+    
+    /* GPU优化 */
+    will-change: transform;
+    transform: translateZ(0.002px); /* 为玻璃面板创建独立复合层 */
+    backface-visibility: hidden;
+}
+
+.settings-wrapper { position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; z-index: 10; }
+.setting-item { display: flex; align-items: center; }
+
+#visual-container {
+    width: clamp(200px, 60vw, 300px);
+    height: clamp(200px, 60vw, 300px);
+    position: relative;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 16px;
+    flex-shrink: 0;
+}
+
+#visual-container img {
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+    object-fit: cover;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+#info-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+#audio-info { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+
+.info-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--adaptive-text-color);
+    line-height: 1.2;
+    transition: color 0.8s ease-in-out; /* 平滑过渡效果 */
+}
+
+.info-artist {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.1rem;
+    color: var(--adaptive-text-color);
+    line-height: 1.2;
+    transition: color 0.8s ease-in-out; /* 平滑过渡效果 */
+}
+
+.player-controls { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+
+#time-info {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--adaptive-text-color);
+    padding: 0 5px;
+    transition: color 0.8s ease-in-out; /* 平滑过渡效果 */
+}
+
+.progress-bar-container.simple { 
+    width: 100%; 
+    height: 4px; 
+    background-color: var(--adaptive-progress-bg); 
+    border-radius: 2px; 
+    transition: background-color 0.8s ease-in-out; /* 平滑过渡效果 */
+}
+.progress-bar-fill { 
+    height: 100%; 
+    background-color: var(--adaptive-progress-fill); 
+    border-radius: 2px; 
+    width: 0%; 
+    transition: width 0.1s linear, background-color 0.8s ease-in-out; /* 添加颜色过渡 */
+}
+
+/* --- Loading Indicator --- */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid var(--accent-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* 水流般的自然流动背景动画 - GPU优化版本 */
+@keyframes flowingBackground {
+    0% {
+        background-position: 35% 42%;
+        transform: translateZ(0.001px) scale(1.15) rotate(0.2deg);
+    }
+    12% {
+        background-position: 52% 28%;
+        transform: translateZ(0.001px) scale(1.22) rotate(-0.3deg);
+    }
+    27% {
+        background-position: 71% 55%;
+        transform: translateZ(0.001px) scale(1.18) rotate(0.4deg);
+    }
+    41% {
+        background-position: 48% 73%;
+        transform: translateZ(0.001px) scale(1.25) rotate(-0.1deg);
+    }
+    58% {
+        background-position: 22% 61%;
+        transform: translateZ(0.001px) scale(1.20) rotate(0.5deg);
+    }
+    72% {
+        background-position: 67% 39%;
+        transform: translateZ(0.001px) scale(1.23) rotate(-0.4deg);
+    }
+    86% {
+        background-position: 44% 18%;
+        transform: translateZ(0.001px) scale(1.17) rotate(0.2deg);
+    }
+    100% {
+        background-position: 35% 42%;
+        transform: translateZ(0.001px) scale(1.15) rotate(0.2deg);
+    }
+}
+
+/* 主背景的自然流动 - GPU优化版本 */
+@keyframes slowBackgroundFlow {
+    0% {
+        background-position: 45% 38%;
+        transform: translateZ(0.003px) scale(1.03) rotate(0.1deg);
+    }
+    20% {
+        background-position: 58% 52%;
+        transform: translateZ(0.003px) scale(1.05) rotate(-0.1deg);
+    }
+    45% {
+        background-position: 42% 65%;
+        transform: translateZ(0.003px) scale(1.02) rotate(0.15deg);
+    }
+    68% {
+        background-position: 55% 44%;
+        transform: translateZ(0.003px) scale(1.04) rotate(-0.05deg);
+    }
+    85% {
+        background-position: 48% 29%;
+        transform: translateZ(0.003px) scale(1.03) rotate(0.08deg);
+    }
+    100% {
+        background-position: 45% 38%;
+        transform: translateZ(0.003px) scale(1.03) rotate(0.1deg);
+    }
+}
+
+/* 极简模式下的液态流动 - 高性能GPU版本 */
+@keyframes enhancedFlowingBackground {
+    0% {
+        background-position: 28% 35%;
+        transform: translateZ(0.004px) scale(1.15) rotate(0.08deg);
+    }
+    8% {
+        background-position: 71% 18%;
+        transform: translateZ(0.004px) scale(1.18) rotate(-0.12deg);
+    }
+    19% {
+        background-position: 46% 82%;
+        transform: translateZ(0.004px) scale(1.12) rotate(0.15deg);
+    }
+    32% {
+        background-position: 83% 59%;
+        transform: translateZ(0.004px) scale(1.20) rotate(-0.05deg);
+    }
+    47% {
+        background-position: 15% 73%;
+        transform: translateZ(0.004px) scale(1.16) rotate(0.18deg);
+    }
+    61% {
+        background-position: 59% 24%;
+        transform: translateZ(0.004px) scale(1.19) rotate(-0.10deg);
+    }
+    76% {
+        background-position: 37% 91%;
+        transform: translateZ(0.004px) scale(1.14) rotate(0.12deg);
+    }
+    88% {
+        background-position: 92% 42%;
+        transform: translateZ(0.004px) scale(1.17) rotate(-0.08deg);
+    }
+    100% {
+        background-position: 28% 35%;
+        transform: translateZ(0.004px) scale(1.15) rotate(0.08deg);
+    }
+}
+
+.loading-overlay p { margin-top: 1rem; font-size: 0.9rem; color: var(--secondary-text-color); }
+
+/* --- Utility Classes --- */
+.hidden { display: none !important; }
+.ui-hidden { opacity: 0 !important; pointer-events: none !important; }
+.visually-hidden { opacity: 0; pointer-events: none; }
+.setting-item { transition: opacity 0.3s ease-in-out; }
+
+/* --- Minimal Mode Styles (New) --- */
+#player-ui-glass.minimal-mode {
+    flex-direction: row;
+    align-items: center;
+    gap: 4rem;
+    padding: 4rem 6rem; /* Increased horizontal padding for better balance */
+    width: fit-content; /* Fit content with some margin */
+    min-width: 90vw; /* Increased minimum width for better presence */
+    max-width: none; /* Remove max-width constraint completely */
+    height: 60vh; /* Set a substantial height like in the reference */
+    min-height: 500px; /* Increased minimum height for better presence */
+    max-height: 80vh; /* Reasonable maximum height to prevent overflow */
+    
+    /* 增强极简模式下的边框折射效果 */
+    border: 2px solid transparent;
+    background: 
+        linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)) padding-box,
+        linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.8) 0%, 
+            rgba(255, 255, 255, 0.3) 25%, 
+            rgba(255, 255, 255, 0.1) 50%, 
+            rgba(255, 255, 255, 0.3) 75%, 
+            rgba(255, 255, 255, 0.8) 100%
+        ) border-box;
+    box-shadow: 
+        0 8px 32px 0 rgba(0, 0, 0, 0.37),
+        0 0 0 1px rgba(255, 255, 255, 0.1),
+        inset 0 2px 8px rgba(255, 255, 255, 0.5), /* 增强顶部高光 */
+        inset 2px 0 8px rgba(255, 255, 255, 0.5), /* 增强左侧高光 */
+        inset -2px 0 6px rgba(255, 255, 255, 0.3),
+        inset 0 -2px 6px rgba(255, 255, 255, 0.3),
+        inset 0 0 30px 15px rgba(255, 255, 255, 0.08), /* 内部发光 */
+        0 0 25px rgba(255, 255, 255, 0.15); /* 增强外发光 */
+        
+    /* 添加光线折射动画 */
+    position: relative;
+    overflow: hidden;
+}
+
+/* 添加极简模式下的光线折射线条 */
+#player-ui-glass.minimal-mode::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+        90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.3) 20%, 
+        rgba(255, 255, 255, 0.9) 50%, 
+        rgba(255, 255, 255, 0.3) 80%, 
+        transparent 100%
+    );
+    border-radius: 24px 24px 0 0;
+    animation: refractLight 8s ease-in-out infinite;
+}
+
+#player-ui-glass.minimal-mode::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(
+        180deg, 
+        rgba(255, 255, 255, 0.9) 0%, 
+        rgba(255, 255, 255, 0.4) 30%, 
+        rgba(255, 255, 255, 0.1) 60%, 
+        rgba(255, 255, 255, 0.3) 85%, 
+        transparent 100%
+    );
+    border-radius: 24px 0 0 24px;
+    animation: refractLight 8s ease-in-out infinite reverse;
+}
+
+/* 光线折射动画 */
+@keyframes refractLight {
+    0%, 100% {
+        opacity: 0.6;
+        transform: translateX(0px) scaleX(1);
+    }
+    25% {
+        opacity: 0.8;
+        transform: translateX(2px) scaleX(1.1);
+    }
+    50% {
+        opacity: 1;
+        transform: translateX(0px) scaleX(1.05);
+    }
+    75% {
+        opacity: 0.9;
+        transform: translateX(-1px) scaleX(1);
+    }
+}
+
+/* 在极简模式玻璃面板内添加径向高光 */
+#player-ui-glass.minimal-mode #visual-container::before {
+    content: '';
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 120%;
+    height: 120%;
+    background: 
+        radial-gradient(
+            circle at 30% 20%, 
+            rgba(255, 255, 255, 0.2) 0%, 
+            rgba(255, 255, 255, 0.08) 25%, 
+            rgba(255, 255, 255, 0.03) 50%, 
+            transparent 70%
+        );
+    pointer-events: none;
+    z-index: 1;
+    border-radius: 16px;
+    mix-blend-mode: overlay;
+}
+
+/* 确保专辑封面在高光上方 */
+#player-ui-glass.minimal-mode #visual-container img {
+    position: relative;
+    z-index: 2;
+}
+
+/* 极简模式下的更强烈流动效果 */
+#player-ui-glass.minimal-mode ~ #player-ui-distorted-bg {
+    animation: enhancedFlowingBackground 300s cubic-bezier(0.42, 0.0, 0.58, 1.0) infinite;
+    background-size: cover; /* 保持原始比例，避免人脸等图像被拉伸变形 */
+    
+    /* 极简模式下的强化GPU优化 */
+    will-change: transform, background-position;
+    transform: translateZ(0.004px); /* 为极简模式创建专用复合层 */
+    backface-visibility: hidden;
+    perspective: 2000px; /* 增强3D渲染性能 */
+    transform-style: preserve-3d; /* 保持3D变换上下文 */
+}
+
+#player-ui-glass.minimal-mode #visual-container {
+    width: clamp(300px, 25vh, 400px); /* Responsive size based on viewport height */
+    height: clamp(300px, 25vh, 400px); /* Responsive size based on viewport height */
+    margin: 0;
+    flex-shrink: 0;
+    position: relative; /* 确保伪元素正确定位 */
+    overflow: hidden; /* 确保高光不会溢出 */
+}
+
+#player-ui-glass.minimal-mode #info-wrapper {
+    flex-grow: 1;
+    align-items: flex-start;
+    justify-content: center; /* Center content vertically */
+    text-align: left;
+    gap: 1.5rem; /* Slightly increased gap for better spacing */
+    height: 100%; /* Take full height of parent */
+    flex-grow: 1; /* Allow text area to grow */
+    min-width: 0; /* Allow text to overflow properly */
+    max-width: none; /* Remove width constraint to allow full usage */
+    flex-basis: 70%; /* Give text area more base width */
+    
+
+}
+
+#player-ui-glass.minimal-mode #audio-info {
+    margin-bottom: 0;
+    gap: 0.5rem;
+    align-items: flex-start;
+    width: 100%; /* Ensure full width usage */
+}
+
+#player-ui-glass.minimal-mode .info-title {
+    font-size: clamp(2.5rem, 5vw, 6rem); /* Increased font size range for bigger panel */
+    font-weight: 700;
+    letter-spacing: -2px;
+    /* Remove white-space: nowrap to allow wrapping */
+    overflow: visible; /* Ensure text is visible */
+    line-height: 1.1; /* Tighter line spacing */
+    color: var(--adaptive-text-color); /* 使用自适应颜色 */
+    transition: color 0.8s ease-in-out; /* 平滑过渡效果 */
+}
+
+#player-ui-glass.minimal-mode .info-artist {
+    font-size: clamp(1.2rem, 2.5vw, 3rem); /* Increased font size range for bigger panel */
+    font-weight: 500;
+    opacity: 0.9;
+    /* Remove white-space: nowrap to allow wrapping */
+    overflow: visible; /* Ensure text is visible */
+    line-height: 1.2; /* Comfortable line spacing */
+    margin-top: 0.5rem; /* Add some space between title and artist */
+    color: var(--adaptive-text-color); /* 使用自适应颜色 */
+    transition: color 0.8s ease-in-out; /* 平滑过渡效果 */
+}
+
+#player-ui-glass.minimal-mode .player-controls {
+    display: none;
+}
+
+/* 确保时间信息在极简模式下也使用自适应颜色 */
+#player-ui-glass.minimal-mode #time-info {
+    color: var(--adaptive-text-color);
+    transition: color 0.8s ease-in-out;
+}

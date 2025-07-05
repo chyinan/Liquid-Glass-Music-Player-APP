@@ -1,0 +1,20 @@
+{
+  "name": "immersive-music-player",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.6.0",
+    "@tauri-apps/plugin-dialog": "^2.3.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.6.2",
+    "vite": "^5.2.0"
+  }
+}

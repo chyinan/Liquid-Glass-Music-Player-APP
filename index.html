@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid Glass Player</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/style.css">
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- SVG filter for liquid glass distortion effect -->
+    <svg style="position: absolute; width: 0; height: 0;">
+      <filter id="liquid-distortion">
+        <feTurbulence type="turbulence" baseFrequency="0.01 0.03" numOctaves="2" result="turbulence"/>
+        <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </svg>
+
+    <div id="background-blur"></div>
+
+    <div class="container">
+        
+        <div class="file-select-container">
+            <h1>Immersive Music Player</h1>
+            <p>Enjoy your music with a beautiful liquid glass interface.</p>
+            <button class="custom-file-upload" id="loadBtn">
+                <i class="fas fa-cloud-upload-alt"></i> Select Audio File
+            </button>
+            <!-- Hidden file input for compatibility (even though we use Tauri file dialog) -->
+            <input type="file" id="fileInput" accept="audio/*,video/*" style="display: none;">
+        </div>
+
+        <!-- New wrapper for the player to handle the distortion effect -->
+        <div id="player-wrapper" class="hidden">
+            <!-- This div will have the distorted background -->
+            <div id="player-ui-distorted-bg"></div>
+            <!-- The original player UI, now sits on top -->
+            <div id="player-ui-glass">
+                 <div class="settings-wrapper">
+                    <!-- Kept for structure -->
+                </div>
+
+                <div id="visual-container">
+                    <img id="albumArt" src="" alt="Album Art" style="display: none;"/>
+                </div>
+
+                <div id="info-wrapper">
+                    <div id="audio-info">
+                        <div id="songTitle" class="info-title">Unknown Title</div>
+                        <div id="artistName" class="info-artist">Unknown Artist</div>
+                    </div>
+
+                    <div class="player-controls">
+                        <div id="time-info">
+                            <span id="current-time">00:00</span>
+                            <span id="duration">00:00</span>
+                        </div>
+                        <div class="progress-bar-container simple">
+                            <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Processing Audio...</p>
+    </div>
+
+    <audio id="audioPlayer" preload="auto" crossorigin="anonymous" style="display: none;"></audio>
+    
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html> 

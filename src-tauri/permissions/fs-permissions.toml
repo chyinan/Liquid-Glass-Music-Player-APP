@@ -1,0 +1,5 @@
+[[permission]]
+identifier = "allow-read-all-files"
+description = "Allow reading all files"
+[[scope.allow]]
+path = "**/*" 
