@@ -48,8 +48,8 @@
 
 ```bash
 # 克隆仓库
-https://github.com/yourname/immersive-music-player.git
-cd Immersive\ Music\ Player
+git clone https://github.com/chyinan/Liquid-Glass-Music-Player-APP.git
+cd Liquid-Glass-Music-Player-APP
 
 # 安装前端依赖
 npm install
