@@ -129,8 +129,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 audio.currentTime = 0;
                 break;
             case 'f':
-                const appWindow = WebviewWindow.getCurrent();
-                appWindow.setFullscreen(!await appWindow.isFullscreen());
+                // Toggle fullscreen using the browser Fullscreen API for wider compatibility
+                if (!document.fullscreenElement) {
+                    try {
+                        await document.documentElement.requestFullscreen();
+                    } catch (e) {
+                        console.error('Failed to enter fullscreen:', e);
+                    }
+                } else {
+                    try {
+                        await document.exitFullscreen();
+                    } catch (e) {
+                        console.error('Failed to exit fullscreen:', e);
+                    }
+                }
                 break;
             case 'v':
                 // Toggle minimal mode class for advanced glass UI
