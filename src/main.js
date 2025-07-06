@@ -29,6 +29,72 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPlaying = false;
     let artworkUrl = null;
 
+    // === Unified file processing function ===
+    async function handleFile(filePath) {
+        loadingOverlay.style.opacity = '1';
+        loadingOverlay.style.pointerEvents = 'auto';
+        try {
+            console.log('选择的文件:', filePath);
+
+            const result = await invoke('process_audio_file', { path: filePath });
+            console.log('处理结果:', result);
+
+            artistNameEl.textContent = result.metadata.artist || 'Unknown Artist';
+            songTitleEl.textContent = result.metadata.title || 'Unknown Title';
+
+            if (result.album_art_base64) {
+                const mimeType = result.metadata.mime_type || 'image/jpeg';
+                artworkUrl = `data:${mimeType};base64,${result.album_art_base64}`;
+
+                backgroundBlur.style.backgroundImage = `url(${artworkUrl})`;
+                distortedBg.style.backgroundImage = `url(${artworkUrl})`;
+                backgroundBlur.classList.add('active');
+                albumArt.src = artworkUrl;
+                albumArt.style.display = 'block';
+
+                // 检测封面平均色并应用自适应主题
+                analyzeImage(artworkUrl).then((info) => {
+                    if (!info) return resetToDefault();
+                    const { r, g, b, luminance } = info;
+                    if (luminance < 150) {
+                        resetToDefault();
+                    } else {
+                        const { h, s, l } = rgbToHsl(r, g, b);
+                        if (s < 0.15) {
+                            applyAdaptiveColors({ text: '#222222bf' });
+                        } else {
+                            const newL = Math.max(0, l - 0.35);
+                            const { r: dr, g: dg, b: db } = hslToRgb(h, s, newL);
+                            const textColor = `rgb(${dr},${dg},${db})`;
+                            applyAdaptiveColors({ text: textColor });
+                        }
+                    }
+                });
+            } else {
+                // 无封面
+                backgroundBlur.style.backgroundImage = 'none';
+                distortedBg.style.backgroundImage = 'none';
+                backgroundBlur.classList.remove('active');
+                albumArt.src = '';
+                albumArt.style.display = 'none';
+                resetToDefault();
+            }
+
+            audio.src = `data:audio/wav;base64,${result.playback_data_base64}`;
+            audio.load();
+            audio.play().catch(e => console.error('Audio playback failed:', e));
+
+            fileSelectContainer.style.display = 'none';
+            playerWrapper.classList.remove('hidden');
+        } catch (error) {
+            console.error('处理音频时出错:', error);
+            alert(`Error: ${error}`);
+        } finally {
+            loadingOverlay.style.opacity = '0';
+            loadingOverlay.style.pointerEvents = 'none';
+        }
+    }
+
     // === --- Color utilities ----------------------------------------------------------
 
     // 将 rgb 转换为 hsl (r,g,b 0-255 -> h 0-360, s,l 0-1)
@@ -144,85 +210,42 @@ document.addEventListener('DOMContentLoaded', () => {
         progressBarFill.style.width = `${progress}%`;
     });
 
-    // === Core Logic: File Upload & Processing (Adapted for Tauri V2) ===
+    // === Core Logic: File Selection Dialog ===
     loadBtn.addEventListener('click', async () => {
-        loadingOverlay.style.opacity = '1';
-        loadingOverlay.style.pointerEvents = 'auto';
-
         try {
             const selected = await open({
                 multiple: false,
-                filters: [{
-                    name: 'Audio',
-                    extensions: ['mp3', 'wav', 'flac', 'm4a']
-                }]
+                filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'flac', 'm4a'] }]
             });
 
             if (selected) {
-                console.log('选择的文件:', selected);
-                
-                const result = await invoke('process_audio_file', { path: selected });
-                console.log('处理结果:', result);
-
-                artistNameEl.textContent = result.metadata.artist || 'Unknown Artist';
-                songTitleEl.textContent = result.metadata.title || 'Unknown Title';
-
-                if (result.album_art_base64) {
-                    const mimeType = result.metadata.mime_type || 'image/jpeg';
-                    artworkUrl = `data:${mimeType};base64,${result.album_art_base64}`;
-                    
-                    backgroundBlur.style.backgroundImage = `url(${artworkUrl})`;
-                    distortedBg.style.backgroundImage = `url(${artworkUrl})`;
-                    backgroundBlur.classList.add('active');
-                    albumArt.src = artworkUrl;
-                    albumArt.style.display = 'block';
-
-                    // 检测封面平均色并应用自适应主题
-                    analyzeImage(artworkUrl).then((info) => {
-                        if (!info) return resetToDefault();
-                        const { r, g, b, luminance } = info;
-                        if (luminance < 150) {
-                            // 深色封面 -> 使用白色方案
-                            resetToDefault();
-                        } else {
-                            const { h, s, l } = rgbToHsl(r, g, b);
-                            if (s < 0.15) {
-                                // 低饱和度：用统一深灰色
-                                applyAdaptiveColors({ text: '#222222bf' });
-                            } else {
-                                // 生成稍深一档颜色
-                                const newL = Math.max(0, l - 0.35);
-                                const { r: dr, g: dg, b: db } = hslToRgb(h, s, newL);
-                                const textColor = `rgb(${dr},${dg},${db})`;
-                                applyAdaptiveColors({ text: textColor });
-                            }
-                        }
-                    });
-
-                } else {
-                    // Handle no artwork
-                    backgroundBlur.style.backgroundImage = 'none';
-                    distortedBg.style.backgroundImage = 'none';
-                    backgroundBlur.classList.remove('active');
-                    albumArt.src = '';
-                    albumArt.style.display = 'none';
-                    resetToDefault(); // 无封面恢复
-                }
-
-                audio.src = `data:audio/wav;base64,${result.playback_data_base64}`;
-                audio.load();
-                audio.play().catch(e => console.error("Audio playback failed:", e));
-
-                fileSelectContainer.style.display = 'none';
-                playerWrapper.classList.remove('hidden');
-
+                await handleFile(selected);
             }
         } catch (error) {
             console.error('处理音频时出错:', error);
             alert(`Error: ${error}`);
-        } finally {
-            loadingOverlay.style.opacity = '0';
-            loadingOverlay.style.pointerEvents = 'none';
+        }
+    });
+
+    // === Drag & Drop support ===
+    const currentWindow = WebviewWindow.getCurrent();
+    currentWindow.onDragDropEvent(async (evt) => {
+        const { type, paths } = evt.payload;
+
+        if (type === 'enter') {
+            document.body.classList.add('drag-over');
+        } else if (type === 'leave') {
+            document.body.classList.remove('drag-over');
+        } else if (type === 'drop') {
+            document.body.classList.remove('drag-over');
+            if (paths && paths.length) {
+                const audioPath = paths.find(p => /\.(mp3|wav|flac|m4a)$/i.test(p));
+                if (audioPath) {
+                    await handleFile(audioPath);
+                } else {
+                    alert('仅支持拖入音频文件 (.mp3, .wav, .flac, .m4a)');
+                }
+            }
         }
     });
 

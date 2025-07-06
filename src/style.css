@@ -610,3 +610,14 @@ input[type="file"] { display: none; }
     color: var(--adaptive-text-color);
     transition: color 0.8s ease-in-out;
 }
+
+/* --- Drag & Drop Highlight --- */
+body.drag-over {
+    cursor: copy;
+}
+
+body.drag-over .file-select-container,
+body.drag-over #player-wrapper {
+    outline: 2px dashed var(--accent-color);
+    outline-offset: -4px;
+}

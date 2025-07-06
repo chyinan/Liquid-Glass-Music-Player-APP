@@ -10,6 +10,7 @@
     "allow-process-audio-file",
     "fs:default",
     "allow-read-all-files",
-    "fs:allow-temp-read-recursive"
+    "fs:allow-temp-read-recursive",
+    "core:event:default"
   ]
 }
