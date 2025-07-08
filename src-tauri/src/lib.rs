@@ -2,7 +2,8 @@ use tauri_plugin_dialog;
 use std::sync::Mutex;
 use base64::{Engine as _, engine::general_purpose};
 use lofty::file::TaggedFileExt;
-use lofty::tag::Accessor;
+use lofty::tag::{Accessor, ItemKey, Tag};
+use lofty::id3::v2::FrameValue;
 use ffmpeg_sidecar::command::FfmpegCommand;
 use tempfile::{tempdir, TempDir};
 
@@ -25,6 +26,7 @@ struct ProcessedFile {
     metadata: Metadata,
     playback_data_base64: String,
     album_art_base64: Option<String>,
+    lyrics: Option<String>,
 }
 
 #[tauri::command]
@@ -41,6 +43,7 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
     };
 
     let mut album_art_base64 = None;
+    let mut lyrics = None;
 
     if let Some(t) = tag {
         metadata.title = t.title().map(|s| s.to_string());
@@ -51,6 +54,15 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
                 metadata.mime_type = Some(mime.to_string());
             }
             album_art_base64 = Some(general_purpose::STANDARD.encode(picture.data()));
+        }
+        
+        // FINAL ATTEMPT: Simplified lyrics extraction using the generic ItemKey::Lyrics
+        // This avoids all version-specific Id3v2 logic that was causing compilation errors.
+        if let Some(lyrics_item) = t.get(&ItemKey::Lyrics) {
+            // Using .text() as hinted by a previous compiler error message
+            if let Some(lyrics_text) = lyrics_item.value().text() {
+                 lyrics = Some(lyrics_text.to_string());
+            }
         }
     }
     
@@ -89,6 +101,7 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
         metadata,
         playback_data_base64,
         album_art_base64,
+        lyrics,
     })
 }
 
