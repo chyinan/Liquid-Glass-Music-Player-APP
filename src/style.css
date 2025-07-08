@@ -49,7 +49,7 @@ body {
     bottom: -30px;
     background-size: cover; /* 保持原始比例 */
     background-position: center;
-    filter: blur(50px) brightness(0.7);
+    filter: blur(50px) brightness(0.8); /* Slightly increased brightness */
     z-index: -1;
     opacity: 0;
     transition: opacity 0.8s ease-in-out;
@@ -130,6 +130,7 @@ input[type="file"] { display: none; }
     max-width: 450px; /* Revert to a more standard default size */
     border-radius: 24px;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.6); /* NEW: uniform white outline to hide stubborn edges */
     transition: width 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), 
                 max-width 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95),
                 height 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95),
@@ -156,24 +157,28 @@ input[type="file"] { display: none; }
 
 #player-ui-distorted-bg {
     position: absolute;
-    top: 4px;
-    left: 4px;
-    right: 4px;
-    bottom: 4px;
-    background-size: cover; /* 保持原始比例 */
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    background-size: cover;
     background-position: center;
-    border-radius: 20px; /* 进一步减少圆角半径，确保完全被24px圆角覆盖 */
-    filter: url(#liquid-distortion);
+    border-radius: 14px;
+    /* Manually creating the border to fix stubborn rendering bugs */
+    box-shadow: 
+        inset 8px 0 0 0 rgba(255, 255, 255, 0.9),  /* Left */
+        inset -8px 0 0 0 rgba(255, 255, 255, 0.9), /* Right */
+        inset 0 8px 0 0 rgba(255, 255, 255, 0.9),  /* Top */
+        inset 0 -8px 0 0 rgba(255, 255, 255, 0.9); /* Bottom */
     z-index: 1;
     
     /* GPU硬件加速优化 */
     will-change: transform, background-position;
-    transform: translateZ(0.001px); /* 强制创建复合层，避免重绘 */
-    backface-visibility: hidden; /* 隐藏元素背面，优化3D性能 */
-    perspective: 1000px; /* 启用3D渲染上下文 */
+    transform: translateZ(0.001px);
+    backface-visibility: hidden;
+    perspective: 1000px;
     
-    /* 添加流动动画 */
-    animation: flowingBackground 65s cubic-bezier(0.4, 0.0, 0.6, 1.0) infinite;
+    /* Animation is now MOVED to minimal-mode specific rule */
 }
 
 /* --- Liquid Glass Player UI (Adjusted) --- */
@@ -182,11 +187,10 @@ input[type="file"] { display: none; }
     z-index: 2;
     width: 100%; /* Changed to fill the wrapper */
     background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25), 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     backdrop-filter: blur(14px) saturate(1.8);
     -webkit-backdrop-filter: blur(14px) saturate(1.8);
     border-radius: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
     padding: 2rem 2rem 1.5rem;
     display: flex;
     flex-direction: column;
@@ -286,7 +290,7 @@ input[type="file"] { display: none; }
     align-items: center;
     justify-content: center;
     z-index: 100;
-    opacity: 0;
+    opacity: 1;
     pointer-events: none;
     transition: opacity 0.3s;
 }
@@ -540,8 +544,16 @@ input[type="file"] { display: none; }
     z-index: 2;
 }
 
-/* 极简模式下的更强烈流动效果 */
-#player-ui-glass.minimal-mode ~ #player-ui-distorted-bg {
+/* 极简模式下的更强烈流动效果 (CORRECTED SELECTOR) */
+#player-wrapper:has(#player-ui-glass.minimal-mode) #player-ui-distorted-bg {
+    /* Apply user's custom insets only in minimal mode */
+    top: 40px;
+    left: 40px;
+    right: 40px;
+    bottom: 70px;
+    border-radius: 10px; /* Adjust radius for new insets */
+    box-shadow: none; /* Remove the border fix in this mode */
+
     animation: enhancedFlowingBackground 300s cubic-bezier(0.42, 0.0, 0.58, 1.0) infinite;
     background-size: cover; /* 保持原始比例，避免人脸等图像被拉伸变形 */
     

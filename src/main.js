@@ -29,6 +29,9 @@ const lyricsContainer = document.getElementById('lyrics-container');
 const lyricsLinesContainer = document.getElementById('lyrics-lines');
 const noLyricsMessage = document.getElementById('no-lyrics-message');
 
+// 修复：确保加载动画在启动时是隐藏的
+loadingOverlay.classList.add('ui-hidden');
+
 // State
 let isPlaying = false;
 let artworkUrl = null;
@@ -286,12 +289,22 @@ window.addEventListener('keydown', (event) => {
             }
             break;
         case 'l':
+            // 在进入歌词模式前，如果极简模式是激活的，则先退出极简模式
+            if (playerUIGlass.classList.contains('minimal-mode')) {
+                playerUIGlass.classList.remove('minimal-mode');
+                container.classList.remove('minimal-active');
+                playerWrapper.classList.remove('minimal-active');
+            }
             toggleLyrics();
             break;
         case 't':
             toggleTranslation();
             break;
         case 'v':
+            // 在进入极简模式前，如果歌词模式是激活的，则先退出歌词模式
+            if (lyricsActive) {
+                toggleLyrics();
+            }
             // 切换极简模式
             const minimalActive = playerUIGlass.classList.toggle('minimal-mode');
 
@@ -335,6 +348,12 @@ function toggleLyrics() {
     // 直接控制透明度，确保可见性
     lyricsContainer.style.opacity = lyricsActive ? '1' : '0';
 
+    // 修复：切换时立即更新歌词
+    // updateLyrics 只在索引变化时更新 DOM，这是一个优化。
+    // 但切换时，索引可能不变，导致歌词不显示。
+    // 通过临时重置 currentLyricIndex，我们强制 updateLyrics 运行一次，
+    // 立即刷新歌词的显示状态。
+    currentLyricIndex = -1;
     updateLyrics(audioPlayer.currentTime);
 }
 
