@@ -712,7 +712,7 @@ body.lyrics-active .progress-bar-container.simple {
     padding: 0;
     margin: 0;
     width: 100%;
-    height: 300px; /* Fixed height to contain 5 lines */
+    height: 500px; /* Increased height for more spacing */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -721,54 +721,51 @@ body.lyrics-active .progress-bar-container.simple {
     -webkit-mask-image: linear-gradient(
         to bottom,
         transparent 0%,
-        black 25%,
-        black 75%,
+        black 20%,  /* Adjust mask for new height */
+        black 80%,  /* Adjust mask for new height */
         transparent 100%
     );
     mask-image: linear-gradient(
         to bottom,
         transparent 0%,
-        black 25%,
-        black 75%,
+        black 20%,  /* Adjust mask for new height */
+        black 80%,  /* Adjust mask for new height */
         transparent 100%
     );
 }
 
 .lyrics-line {
     font-weight: 600;
-    line-height: 1.8; /* Further increased line-height */
+    line-height: 1.4; /* Adjusted for better multi-line spacing */
     position: absolute;
     width: 100%;
     left: 0;
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0; /* 默认隐藏，等待 JS 更新 data-line-index 来激活 */
+    font-size: 4.0rem; /* NEW: Set base font-size to the largest size */
+    transform-origin: left center; /* NEW: Ensure scaling is from the left */
 }
 
-/* Define positions and styles for 5 lines - FINAL BOLD STYLING */
-.lyrics-line[data-line-index="-2"] { /* Top-most line */
-    transform: translateY(-340%);
-    font-size: 2.2rem;
+/* Define positions and styles for 5 lines - NOW WITH SCALE() and corrected REM-based translation */
+.lyrics-line[data-line-index="-2"] {
+    transform: translateY(-16rem) scale(0.55); /* Further increased spacing */
     opacity: 0.2;
 }
 .lyrics-line[data-line-index="-1"] {
-    transform: translateY(-170%);
-    font-size: 2.8rem;
+    transform: translateY(-9.5rem) scale(0.7); /* Further increased spacing */
     opacity: 0.5;
 }
 .lyrics-line[data-line-index="0"] { /* Current line */
-    transform: translateY(0);
-    font-size: 4.0rem;
+    transform: translateY(0) scale(1);
     opacity: 1;
     color: var(--accent-color);
 }
 .lyrics-line[data-line-index="1"] {
-    transform: translateY(170%);
-    font-size: 2.8rem;
+    transform: translateY(9.5rem) scale(0.7); /* Further increased spacing */
     opacity: 0.5;
 }
-.lyrics-line[data-line-index="2"] { /* Bottom-most line */
-    transform: translateY(340%);
-    font-size: 2.2rem;
+.lyrics-line[data-line-index="2"] {
+    transform: translateY(16rem) scale(0.55); /* Further increased spacing */
     opacity: 0.2;
 }
 

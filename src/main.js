@@ -35,6 +35,7 @@ let artworkUrl = null;
 let lyricsActive = false;
 let parsedLyrics = [];
 let currentLyricIndex = -1;
+let showTranslation = false;
 
 // === 颜色工具函数和自适应主题 ===
 function rgbToHsl(r, g, b) {
@@ -133,6 +134,7 @@ async function handleFile(filePath) {
         lyricsLinesContainer.innerHTML = '';
         noLyricsMessage.classList.add('hidden');
         currentLyricIndex = -1;
+        showTranslation = false;
         
         const result = await invoke('process_audio_file', { path: filePath });
         console.log('处理结果:', result);
@@ -286,6 +288,9 @@ window.addEventListener('keydown', (event) => {
         case 'l':
             toggleLyrics();
             break;
+        case 't':
+            toggleTranslation();
+            break;
         case 'v':
             // 切换极简模式
             const minimalActive = playerUIGlass.classList.toggle('minimal-mode');
@@ -335,8 +340,8 @@ function toggleLyrics() {
 
 function parseLRC(lrcText) {
     const lines = lrcText.split(/\r\n|\n|\r/);
-    const lyrics = [];
     const timeRegex = /\[(\d{2}):(\d{2})[.:](\d{2,3})\]/;
+    const intermediate = [];
 
     for (const line of lines) {
         const match = line.match(timeRegex);
@@ -347,11 +352,26 @@ function parseLRC(lrcText) {
             const time = minutes * 60 + seconds + milliseconds / 1000;
             const text = line.replace(timeRegex, '').trim();
             if (text) {
-                lyrics.push({ time, text });
+                intermediate.push({ time, text });
             }
         }
     }
-    return lyrics;
+
+    if (intermediate.length === 0) return [];
+
+    const finalLyrics = [];
+    for (let i = 0; i < intermediate.length; i++) {
+        const current = intermediate[i];
+        const next = i + 1 < intermediate.length ? intermediate[i + 1] : null;
+
+        if (next && next.time === current.time) {
+            finalLyrics.push({ time: current.time, text: current.text, translation: next.text });
+            i++; // 跳过下一行，因为它已经是翻译
+        } else {
+            finalLyrics.push({ time: current.time, text: current.text, translation: null });
+        }
+    }
+    return finalLyrics;
 }
 
 function updateLyrics(currentTime) {
@@ -391,6 +411,27 @@ function renderAllLyricsOnce() {
         li.classList.add('lyrics-line');
         li.textContent = line.text;
         li.dataset.absIndex = index; // 存储其在数组中的绝对索引
+        if (line.translation) {
+            // 将原文和译文都存储起来，方便切换
+            li.dataset.original = line.text;
+            li.dataset.translation = line.translation;
+        }
         lyricsLinesContainer.appendChild(li);
     });
 }
+
+// 新增：切换翻译函数
+function toggleTranslation() {
+    if (parsedLyrics.length === 0 || !parsedLyrics.some(l => l.translation)) {
+        return; // 如果没有歌词或没有翻译，则不执行任何操作
+    }
+    showTranslation = !showTranslation;
+
+    const allLines = lyricsLinesContainer.querySelectorAll('.lyrics-line');
+    allLines.forEach(line => {
+        if (line.dataset.translation) {
+            line.textContent = showTranslation ? line.dataset.translation : line.dataset.original;
+        }
+    });
+}
+
