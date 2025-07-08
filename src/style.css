@@ -47,7 +47,7 @@ body {
     left: -30px;
     right: -30px;
     bottom: -30px;
-    background-size: 120% 120%; /* 稍微放大以便流动 */
+    background-size: cover; /* 保持原始比例 */
     background-position: center;
     filter: blur(50px) brightness(0.7);
     z-index: -1;
