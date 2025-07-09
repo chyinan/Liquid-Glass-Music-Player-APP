@@ -35,10 +35,12 @@ loadingOverlay.classList.add('ui-hidden');
 // State
 let isPlaying = false;
 let artworkUrl = null;
-let lyricsActive = false;
+// This old variable was causing the issue. It's now removed.
 let parsedLyrics = [];
 let currentLyricIndex = -1;
-let showTranslation = false;
+// NEW: State for lyrics display mode
+// 0: off, 1: translation only, 2: bilingual, 3: original only
+let lyricsDisplayMode = 0;
 
 // === 颜色工具函数和自适应主题 ===
 function rgbToHsl(r, g, b) {
@@ -137,7 +139,6 @@ async function handleFile(filePath) {
         lyricsLinesContainer.innerHTML = '';
         noLyricsMessage.classList.add('hidden');
         currentLyricIndex = -1;
-        showTranslation = false;
         
         const result = await invoke('process_audio_file', { path: filePath });
         console.log('处理结果:', result);
@@ -158,6 +159,13 @@ async function handleFile(filePath) {
 
         artistNameEl.textContent = result.metadata.artist || 'Unknown Artist';
         songTitleEl.textContent = result.metadata.title || 'Unknown Title';
+
+        // Manually trigger check after new text is set.
+        // A small timeout helps ensure scrollWidth is updated.
+        setTimeout(() => {
+            // applyMarquee(songTitleEl);
+            // applyMarquee(artistNameEl);
+        }, 100);
 
         if (result.album_art_base64) {
             const mimeType = result.metadata.mime_type || 'image/jpeg';
@@ -297,13 +305,12 @@ window.addEventListener('keydown', (event) => {
             }
             toggleLyrics();
             break;
-        case 't':
-            toggleTranslation();
-            break;
         case 'v':
             // 在进入极简模式前，如果歌词模式是激活的，则先退出歌词模式
-            if (lyricsActive) {
-                toggleLyrics();
+            if (lyricsDisplayMode !== 0) { // Check against the new state
+                // Set mode to the last state (original) so the next toggle turns it off.
+                lyricsDisplayMode = 3; 
+                toggleLyrics(); // This will now cycle to 0 (off) and update the UI correctly.
             }
             // 切换极简模式
             const minimalActive = playerUIGlass.classList.toggle('minimal-mode');
@@ -330,32 +337,64 @@ function hideLoading() {
 }
 
 function toggleLyrics() {
-    lyricsActive = !lyricsActive;
-    document.body.classList.toggle('lyrics-active', lyricsActive);
+    // Cycle through modes: 0 (off) -> 1 (translation) -> 2 (bilingual) -> 3 (original) -> 0 (off)
+    lyricsDisplayMode = (lyricsDisplayMode + 1) % 4;
 
+    const lyricsActive = lyricsDisplayMode !== 0;
+
+    // This is the missing line that controls the visibility of the entire lyrics panel.
+    lyricsContainer.classList.toggle('hidden', !lyricsActive);
+
+    // Remove all mode classes before adding the new one
+    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-original');
+
+    if (lyricsActive) {
+        document.body.classList.add('lyrics-active');
+        switch (lyricsDisplayMode) {
+            case 1: // Translation only
+                document.body.classList.add('lyrics-mode-translation');
+                break;
+            case 2: // Bilingual
+                document.body.classList.add('lyrics-mode-bilingual');
+                break;
+            case 3: // Original only
+                document.body.classList.add('lyrics-mode-original');
+                break;
+        }
+    }
+
+    // NEW: Show a friendly notice if user switches to translation-only mode but no translation exists
+    if (lyricsDisplayMode === 1) { // translation-only
+        const hasTranslation = parsedLyrics.some(l => l.translation);
+        if (!hasTranslation) {
+            noLyricsMessage.textContent = '此歌曲暂无翻译';
+            noLyricsMessage.classList.remove('hidden');
+        } else {
+            noLyricsMessage.classList.add('hidden');
+        }
+    } else {
+        // Hide the "no translation" notice when leaving translation-only mode (but keep it visible if it was the original no-lyrics message)
+        if (noLyricsMessage.textContent === '此歌曲暂无翻译') {
+            noLyricsMessage.classList.add('hidden');
+        }
+    }
+    
     const settings = document.querySelector('.settings-wrapper');
     if (settings) {
         settings.classList.toggle('visually-hidden', lyricsActive);
     }
-
-    // 切换歌词容器显示
-    if (lyricsActive) {
-        lyricsContainer.classList.remove('hidden');
-    } else {
-        lyricsContainer.classList.add('hidden');
-    }
-
-    // 直接控制透明度，确保可见性
-    lyricsContainer.style.opacity = lyricsActive ? '1' : '0';
-
+    
     // 修复：切换时立即更新歌词
-    // updateLyrics 只在索引变化时更新 DOM，这是一个优化。
-    // 但切换时，索引可能不变，导致歌词不显示。
-    // 通过临时重置 currentLyricIndex，我们强制 updateLyrics 运行一次，
-    // 立即刷新歌词的显示状态。
     currentLyricIndex = -1;
     updateLyrics(audioPlayer.currentTime);
+
+    // Re-check marquee status after toggling lyrics mode.
+    // applyMarquee(songTitleEl);
+    // applyMarquee(artistNameEl);
 }
+
+// All marquee-related JavaScript has been removed for simplicity.
+// Text will now wrap by default based on CSS rules.
 
 function parseLRC(lrcText) {
     const lines = lrcText.split(/\r\n|\n|\r/);
@@ -398,26 +437,87 @@ function updateLyrics(currentTime) {
         return;
     }
 
-    let newLyricIndex = parsedLyrics.findIndex(line => line.time > currentTime) - 1;
-    if (newLyricIndex < 0) newLyricIndex = 0;
+    // 计算新索引：找到第一句时间大于 currentTime 的行
+    const firstLaterIdx = parsedLyrics.findIndex(line => line.time > currentTime);
+    let newLyricIndex;
+    if (firstLaterIdx === -1) {
+        // 已经超过最后一句歌词时间，保持在最后一句
+        newLyricIndex = parsedLyrics.length - 1;
+    } else {
+        newLyricIndex = firstLaterIdx - 1;
+        if (newLyricIndex < 0) newLyricIndex = 0;
+    }
 
-    if (newLyricIndex !== currentLyricIndex || !lyricsActive) {
+    const isActive = lyricsDisplayMode !== 0;
+
+    // The condition should ONLY update the index.
+    // The DOM update logic must run every time to handle mode switches.
+    if (newLyricIndex !== currentLyricIndex) {
         currentLyricIndex = newLyricIndex;
+    }
 
-        const allLines = lyricsLinesContainer.querySelectorAll('.lyrics-line');
+    const allLines = lyricsLinesContainer.querySelectorAll('.lyrics-line');
 
-        allLines.forEach(line => {
-            const absIndex = parseInt(line.dataset.absIndex, 10);
-            const relativeIndex = absIndex - currentLyricIndex;
+    // === 1. Main Update Loop: Set intended positions and clean up old states ===
+    allLines.forEach(line => {
+        const absIndex = parseInt(line.dataset.absIndex, 10);
+        const relativeIndex = absIndex - currentLyricIndex;
 
-            // 仅更新可见范围内的行，其余的会因没有 data-line-index 而被 CSS 隐藏
-            if (lyricsActive && relativeIndex >= -2 && relativeIndex <= 2) {
-                line.dataset.lineIndex = relativeIndex;
-            } else {
-                // 移除 data-line-index 会使其恢复到默认的隐藏状态
-                delete line.dataset.lineIndex;
+        // A line should be made visible again if it becomes the current line,
+        // or if lyrics are turned off, or it scrolls far away.
+        if (line.classList.contains('skip-line')) {
+            if (relativeIndex === 0 || !isActive || Math.abs(relativeIndex) > 1) {
+                line.classList.remove('skip-line');
             }
-        });
+        }
+        
+        // If, after cleanup, it's still marked to be skipped, keep it hidden and do nothing else.
+        if (line.classList.contains('skip-line')) {
+             delete line.dataset.lineIndex;
+             return;
+        }
+
+        // Set the data-line-index for all potentially visible neighbors.
+        // The CSS will position them, making them ready for measurement.
+        if (isActive && Math.abs(relativeIndex) <= 2) {
+            line.dataset.lineIndex = relativeIndex;
+        } else {
+            delete line.dataset.lineIndex;
+        }
+    });
+
+    // === 2. Force Layout Flush ===
+    // This is the key to fixing the "flash". It forces the browser to apply all the
+    // style changes from setting data-line-index above, so that getBoundingClientRect
+    // will return the final, correct positions in the next step.
+    void lyricsLinesContainer.offsetHeight;
+
+    // === 3. Overlap Check & Final Hide ===
+    // Now, read the just-calculated positions and hide any lines that collide.
+    if (isActive) {
+        const currentLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="0"]');
+        if (!currentLi) return;
+        const currRect = currentLi.getBoundingClientRect();
+
+        // Check previous line for overlap.
+        const prevLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="-1"]');
+        if (prevLi) {
+            const prevRect = prevLi.getBoundingClientRect();
+            if (prevRect.bottom > currRect.top + 10) {
+                prevLi.classList.add('skip-line', 'fade-out-up');
+                prevLi.addEventListener('animationend', () => prevLi.classList.remove('fade-out-up'), { once: true });
+            }
+        }
+
+        // Check next line for overlap.
+        const nextLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="1"]');
+        if (nextLi) {
+            const nextRect = nextLi.getBoundingClientRect();
+            if (nextRect.top < currRect.bottom - 10) {
+                nextLi.classList.add('skip-line', 'fade-out-down');
+                nextLi.addEventListener('animationend', () => nextLi.classList.remove('fade-out-down'), { once: true });
+            }
+        }
     }
 }
 
@@ -428,29 +528,24 @@ function renderAllLyricsOnce() {
     parsedLyrics.forEach((line, index) => {
         const li = document.createElement('li');
         li.classList.add('lyrics-line');
-        li.textContent = line.text;
         li.dataset.absIndex = index; // 存储其在数组中的绝对索引
+
+        const originalSpan = document.createElement('span');
+        originalSpan.classList.add('original-lyric');
+        originalSpan.textContent = line.text;
+
+        const translatedSpan = document.createElement('span');
+        translatedSpan.classList.add('translated-lyric');
+        // Only add translation if it exists
         if (line.translation) {
-            // 将原文和译文都存储起来，方便切换
-            li.dataset.original = line.text;
-            li.dataset.translation = line.translation;
+            translatedSpan.textContent = line.translation;
         }
+        // If no translation, the span will be empty, and the CSS ':empty' selector will hide it.
+
+        li.appendChild(originalSpan);
+        li.appendChild(translatedSpan);
+
         lyricsLinesContainer.appendChild(li);
-    });
-}
-
-// 新增：切换翻译函数
-function toggleTranslation() {
-    if (parsedLyrics.length === 0 || !parsedLyrics.some(l => l.translation)) {
-        return; // 如果没有歌词或没有翻译，则不执行任何操作
-    }
-    showTranslation = !showTranslation;
-
-    const allLines = lyricsLinesContainer.querySelectorAll('.lyrics-line');
-    allLines.forEach(line => {
-        if (line.dataset.translation) {
-            line.textContent = showTranslation ? line.dataset.translation : line.dataset.original;
-        }
     });
 }
 

@@ -166,10 +166,10 @@ input[type="file"] { display: none; }
     border-radius: 14px;
     /* Manually creating the border to fix stubborn rendering bugs */
     box-shadow: 
-        inset 8px 0 0 0 rgba(255, 255, 255, 0.9),  /* Left */
-        inset -8px 0 0 0 rgba(255, 255, 255, 0.9), /* Right */
-        inset 0 8px 0 0 rgba(255, 255, 255, 0.9),  /* Top */
-        inset 0 -8px 0 0 rgba(255, 255, 255, 0.9); /* Bottom */
+        inset 6px 0 0 0 rgba(44, 44, 44, 0.9),  /* Left */
+        inset -6px 0 0 0 rgba(44, 44, 44, 0.9), /* Right */
+        inset 0 6px 0 0 rgba(44, 44, 44, 0.9),  /* Top */
+        inset 0 -6px 0 0 rgba(89, 89, 89, 0.9); /* Bottom */
     z-index: 1;
     
     /* GPU硬件加速优化 */
@@ -197,6 +197,7 @@ input[type="file"] { display: none; }
     align-items: center;
     gap: 1rem;
     text-align: center;
+    min-height: 480px; /* Give panel a min-height for adaptive layout */
     
     /* GPU优化 */
     will-change: transform;
@@ -230,8 +231,15 @@ input[type="file"] { display: none; }
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
-#info-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-#audio-info { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+#info-wrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-grow: 1; /* Allow wrapper to fill vertical space */
+    justify-content: space-around; /* Distribute content adaptively */
+}
+#audio-info { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
 
 .info-title {
     font-family: 'Inter', sans-serif;
@@ -241,9 +249,10 @@ input[type="file"] { display: none; }
     line-height: 1.2;
     transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95);
     /* Prevent text wrapping during transitions for a smoother effect */
-    white-space: nowrap;
+    white-space: normal; /* Allow wrapping by default */
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block; /* Revert to block */
 }
 
 .info-artist {
@@ -253,10 +262,14 @@ input[type="file"] { display: none; }
     line-height: 1.2;
     transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95);
     /* Prevent text wrapping during transitions for a smoother effect */
-    white-space: nowrap;
+    white-space: normal; /* Allow wrapping by default */
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block; /* Revert to block */
 }
+
+/* All marquee-related CSS has been removed for simplicity and stability. */
+/* Text will now wrap in all modes if it overflows. */
 
 .player-controls { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
 
@@ -652,7 +665,7 @@ body.drag-over #player-wrapper {
 #lyrics-container {
     position: absolute;
     right: 0;
-    width: 50vw; /* Occupy the right half of the viewport */
+    width: 55vw; /* Occupy more of the right viewport for longer lines */
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -674,7 +687,7 @@ body.lyrics-active #lyrics-container {
 
 /* NEW: When lyrics are active, move the entire player container to the left */
 body.lyrics-active .container {
-    transform: translateX(-20vw); /* Move a bit to the right to reduce separation */
+    transform: translateX(-23vw); /* Move further left to accommodate wider lyrics */
 }
 
 /* NEW: Enlarge the player itself when lyrics are active to fill the red box */
@@ -732,7 +745,7 @@ body.lyrics-active .progress-bar-container.simple {
     padding: 0;
     margin: 0;
     width: 100%;
-    height: 500px; /* Increased height for more spacing */
+    height: 600px; /* Further increased height for more spacing */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -760,19 +773,74 @@ body.lyrics-active .progress-bar-container.simple {
     position: absolute;
     width: 100%;
     left: 0;
+    top: 50%; /* NEW: center baseline so current line is visible */
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0; /* 默认隐藏，等待 JS 更新 data-line-index 来激活 */
-    font-size: 4.0rem; /* NEW: Set base font-size to the largest size */
     transform-origin: left center; /* NEW: Ensure scaling is from the left */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Align text to the left */
+    gap: 0.5rem; /* Space between original and translation */
 }
+
+/* Base style for both lyric lines */
+.original-lyric, .translated-lyric {
+    width: 100%;
+    line-height: 1.3; /* Tighter line height for individual lines */
+}
+
+/* Style for the main, original lyric */
+.original-lyric {
+    font-size: 4.0rem;
+}
+
+/* Style for the smaller, translated lyric */
+.translated-lyric {
+    font-size: 2.2rem; /* As requested, smaller but not too small */
+    opacity: 0.8; /* Slightly less prominent */
+    padding-left: 0.4rem; /* NEW: Slight indent to visually align with original */
+}
+
+/* General rule: hide the translation span if it's empty to prevent unwanted spacing */
+.translated-lyric:empty {
+    display: none;
+}
+
+/* --- Visibility rules based on body class --- */
+
+/* 1. Original Only Mode */
+body.lyrics-mode-original .translated-lyric {
+    display: none;
+}
+/* In original-only mode, the single line should be centered in its space */
+body.lyrics-mode-original .lyrics-line {
+    justify-content: center;
+}
+
+
+/* 2. Translation Only Mode */
+body.lyrics-mode-translation .original-lyric {
+    display: none;
+}
+/* In translation-only mode, the single line should be centered and maybe slightly larger */
+body.lyrics-mode-translation .translated-lyric {
+    font-size: 4.0rem; /* Make it same size as original-only */
+    opacity: 1;
+}
+body.lyrics-mode-translation .lyrics-line {
+    justify-content: center;
+}
+
+/* 3. Bilingual mode has both visible by default, so no special rules needed here. */
+
 
 /* Define positions and styles for 5 lines - NOW WITH SCALE() and corrected REM-based translation */
 .lyrics-line[data-line-index="-2"] {
-    transform: translateY(-16rem) scale(0.55); /* Further increased spacing */
+    transform: translateY(-24rem) scale(0.55); /* Increased spacing */
     opacity: 0.2;
 }
 .lyrics-line[data-line-index="-1"] {
-    transform: translateY(-9.5rem) scale(0.7); /* Further increased spacing */
+    transform: translateY(-12rem) scale(0.7); /* Increased spacing */
     opacity: 0.5;
 }
 .lyrics-line[data-line-index="0"] { /* Current line */
@@ -781,22 +849,72 @@ body.lyrics-active .progress-bar-container.simple {
     color: var(--accent-color);
 }
 .lyrics-line[data-line-index="1"] {
-    transform: translateY(9.5rem) scale(0.7); /* Further increased spacing */
+    transform: translateY(12rem) scale(0.7); /* Increased spacing */
     opacity: 0.5;
 }
 .lyrics-line[data-line-index="2"] {
-    transform: translateY(16rem) scale(0.55); /* Further increased spacing */
+    transform: translateY(24rem) scale(0.55); /* Increased spacing */
     opacity: 0.2;
 }
 
+/* When the active line has no translation, center the original lyric */
+.lyrics-line[data-line-index="0"]:has(.translated-lyric:empty) {
+     justify-content: center;
+}
+
 #no-lyrics-message {
+    position: absolute; /* Center it within lyrics-container */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     font-size: 1.8rem;
     font-weight: 500;
-    color: var(--secondary-text-color);
+    color: var(--adaptive-text-color); /* Use adaptive text color for consistency */
     opacity: 0;
+    text-align: center;
     transition: opacity 0.5s ease-in-out;
 }
 
 #no-lyrics-message:not(.hidden) {
-    opacity: 0.8;
+    opacity: 0.9;
+}
+
+/* --- Fade-out Up Animation for Lyrics Lines (NEW) --- */
+@keyframes fadeOutUp {
+    0% {
+        opacity: 0.5;
+        transform: translateY(-12rem) scale(0.7);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-24rem) scale(0.55);
+    }
+}
+
+.fade-out-up {
+    animation: fadeOutUp 0.5s ease-in forwards;
+    pointer-events: none; /* Prevent interaction during fade */
+}
+
+@keyframes fadeOutDown {
+    0% {
+        opacity: 0.5;
+        transform: translateY(12rem) scale(0.7);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(24rem) scale(0.55);
+    }
+}
+
+.fade-out-down {
+    animation: fadeOutDown 0.5s ease-in forwards;
+    pointer-events: none;
+}
+
+/* Utility class: keep line hidden without animation re-trigger */
+.skip-line {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
