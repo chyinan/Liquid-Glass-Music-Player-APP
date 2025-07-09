@@ -243,7 +243,7 @@ input[type="file"] { display: none; }
 
 .info-title {
     font-family: 'Inter', sans-serif;
-    font-size: 1.8rem;
+    font-size: 1.3rem; /* Slightly smaller default title size */
     font-weight: 600;
     color: var(--adaptive-text-color);
     line-height: 1.2;
@@ -618,7 +618,7 @@ input[type="file"] { display: none; }
 }
 
 #player-ui-glass.minimal-mode .info-title {
-    font-size: clamp(2.5rem, 5vw, 6rem); /* Increased font size range for bigger panel */
+    font-size: clamp(2rem, 4vw, 5rem); /* Slightly smaller for minimal mode */
     font-weight: 700;
     letter-spacing: -2px;
     /* Remove white-space: nowrap to allow wrapping */
@@ -719,7 +719,7 @@ body.lyrics-active #audio-info {
 }
 
 body.lyrics-active .info-title {
-    font-size: 3rem;
+    font-size: 2rem; /* Slightly smaller in lyrics mode */
 }
 
 body.lyrics-active .info-artist {
