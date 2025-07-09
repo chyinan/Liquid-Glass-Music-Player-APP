@@ -452,26 +452,26 @@ input[type="file"] { display: none; }
     min-height: 500px; /* Increased minimum height for better presence */
     max-height: 80vh; /* Reasonable maximum height to prevent overflow */
     
-    /* 增强极简模式下的边框折射效果 */
+    /* 增强极简模式下的边框折射效果 - 亮度已调低 */
     border: 2px solid transparent;
     background: 
-        linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)) padding-box,
+        linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)) padding-box, /* Main background dimmed */
         linear-gradient(135deg, 
-            rgba(255, 255, 255, 0.8) 0%, 
-            rgba(255, 255, 255, 0.3) 25%, 
-            rgba(255, 255, 255, 0.1) 50%, 
-            rgba(255, 255, 255, 0.3) 75%, 
-            rgba(255, 255, 255, 0.8) 100%
+            rgba(255, 255, 255, 0.6) 0%,  /* Border highlights dimmed */
+            rgba(255, 255, 255, 0.2) 25%, 
+            rgba(255, 255, 255, 0.05) 50%, 
+            rgba(255, 255, 255, 0.2) 75%, 
+            rgba(255, 255, 255, 0.6) 100%
         ) border-box;
     box-shadow: 
         0 8px 32px 0 rgba(0, 0, 0, 0.37),
-        0 0 0 1px rgba(255, 255, 255, 0.1),
-        inset 0 2px 8px rgba(255, 255, 255, 0.5), /* 增强顶部高光 */
-        inset 2px 0 8px rgba(255, 255, 255, 0.5), /* 增强左侧高光 */
-        inset -2px 0 6px rgba(255, 255, 255, 0.3),
-        inset 0 -2px 6px rgba(255, 255, 255, 0.3),
-        inset 0 0 30px 15px rgba(255, 255, 255, 0.08), /* 内部发光 */
-        0 0 25px rgba(255, 255, 255, 0.15); /* 增强外发光 */
+        0 0 0 1px rgba(255, 255, 255, 0.08), /* Outline dimmed */
+        inset 0 2px 8px rgba(255, 255, 255, 0.3), /* Top highlight dimmed */
+        inset 2px 0 8px rgba(255, 255, 255, 0.3), /* Left highlight dimmed */
+        inset -2px 0 6px rgba(255, 255, 255, 0.15), /* Other highlights dimmed */
+        inset 0 -2px 6px rgba(255, 255, 255, 0.15),
+        inset 0 0 30px 15px rgba(255, 255, 255, 0.05), /* Inner glow dimmed */
+        0 0 25px rgba(255, 255, 255, 0.1); /* Outer glow dimmed */
         
     /* 添加光线折射动画 */
     position: relative;
@@ -489,9 +489,9 @@ input[type="file"] { display: none; }
     background: linear-gradient(
         90deg, 
         transparent 0%, 
-        rgba(255, 255, 255, 0.3) 20%, 
-        rgba(255, 255, 255, 0.9) 50%, 
-        rgba(255, 255, 255, 0.3) 80%, 
+        rgba(255, 255, 255, 0.2) 20%, /* Highlight dimmed */
+        rgba(255, 255, 255, 0.6) 50%, /* Highlight dimmed */
+        rgba(255, 255, 255, 0.2) 80%, /* Highlight dimmed */
         transparent 100%
     );
     border-radius: 24px 24px 0 0;
@@ -507,10 +507,10 @@ input[type="file"] { display: none; }
     height: 100%;
     background: linear-gradient(
         180deg, 
-        rgba(255, 255, 255, 0.9) 0%, 
-        rgba(255, 255, 255, 0.4) 30%, 
-        rgba(255, 255, 255, 0.1) 60%, 
-        rgba(255, 255, 255, 0.3) 85%, 
+        rgba(255, 255, 255, 0.6) 0%,  /* Highlight dimmed */
+        rgba(255, 255, 255, 0.25) 30%, 
+        rgba(255, 255, 255, 0.05) 60%, 
+        rgba(255, 255, 255, 0.2) 85%, 
         transparent 100%
     );
     border-radius: 24px 0 0 24px;
@@ -548,9 +548,9 @@ input[type="file"] { display: none; }
     background: 
         radial-gradient(
             circle at 30% 20%, 
-            rgba(255, 255, 255, 0.2) 0%, 
-            rgba(255, 255, 255, 0.08) 25%, 
-            rgba(255, 255, 255, 0.03) 50%, 
+            rgba(255, 255, 255, 0.15) 0%, /* Highlight dimmed */
+            rgba(255, 255, 255, 0.05) 25%, 
+            rgba(255, 255, 255, 0.01) 50%, 
             transparent 70%
         );
     pointer-events: none;
