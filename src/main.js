@@ -445,71 +445,67 @@ function updateLyrics(currentTime) {
     // The DOM update logic must run every time to handle mode switches.
     if (newLyricIndex !== currentLyricIndex) {
         currentLyricIndex = newLyricIndex;
-    }
 
-    const allLines = lyricsLinesContainer.querySelectorAll('.lyrics-line');
-
-    // === 1. Main Update Loop: Set intended positions and clean up old states ===
-    allLines.forEach(line => {
-        const absIndex = parseInt(line.dataset.absIndex, 10);
-        const relativeIndex = absIndex - currentLyricIndex;
-
-        // A line should be made visible again if it becomes the current line,
-        // or if lyrics are turned off, or it scrolls far away.
-        if (line.classList.contains('skip-line')) {
-            if (relativeIndex === 0 || !isActive || Math.abs(relativeIndex) > 1) {
-                line.classList.remove('skip-line');
-            }
-        }
+        // --- CORE LOGIC MOVED ---
+        // This entire block now ONLY runs when the lyric line changes,
+        // preventing the high-frequency updates that caused the flickering.
         
-        // If, after cleanup, it's still marked to be skipped, keep it hidden and do nothing else.
-        if (line.classList.contains('skip-line')) {
-             delete line.dataset.lineIndex;
-             return;
-        }
+        const allLines = lyricsLinesContainer.querySelectorAll('.lyrics-line');
 
-        // Set the data-line-index for all potentially visible neighbors.
-        // The CSS will position them, making them ready for measurement.
-        if (isActive && Math.abs(relativeIndex) <= 2) {
-            line.dataset.lineIndex = relativeIndex;
-        } else {
-            delete line.dataset.lineIndex;
-        }
-    });
+        // First, reset any special state from the previous line to prevent flickering.
+        // This is a more robust way to clean up.
+        allLines.forEach(line => line.classList.remove('move-up-more'));
 
-    // === 2. Force Layout Flush ===
-    // This is the key to fixing the "flash". It forces the browser to apply all the
-    // style changes from setting data-line-index above, so that getBoundingClientRect
-    // will return the final, correct positions in the next step.
-    void lyricsLinesContainer.offsetHeight;
+        // === 1. Main Update Loop: Set intended positions ===
+        allLines.forEach(line => {
+            const absIndex = parseInt(line.dataset.absIndex, 10);
+            const relativeIndex = absIndex - currentLyricIndex;
 
-    // === 3. Overlap Check & Final Hide ===
-    // Now, read the just-calculated positions and hide any lines that collide.
-    if (isActive) {
-        const currentLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="0"]');
-        if (!currentLi) return;
-        const currRect = currentLi.getBoundingClientRect();
-
-        // Check previous line for overlap.
-        const prevLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="-1"]');
-        if (prevLi) {
-            const prevRect = prevLi.getBoundingClientRect();
-            if (prevRect.bottom > currRect.top + 10) {
-                // Instead of hiding, add a class to move it up further.
-                prevLi.classList.add('move-up-more');
-            } else {
-                // If it doesn't overlap, ensure the class is removed.
-                prevLi.classList.remove('move-up-more');
+            if (line.classList.contains('skip-line')) {
+                if (relativeIndex === 0 || !isActive || Math.abs(relativeIndex) > 1) {
+                    line.classList.remove('skip-line');
+                }
             }
-        }
+            
+            if (line.classList.contains('skip-line')) {
+                 delete line.dataset.lineIndex;
+                 return;
+            }
 
-        // Check next line for overlap (still hide it for simplicity).
-        const nextLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="1"]');
-        if (nextLi) {
-            const nextRect = nextLi.getBoundingClientRect();
-            if (nextRect.top < currRect.bottom - 10) {
-                nextLi.classList.add('skip-line', 'fade-out-down');
-                nextLi.addEventListener('animationend', () => nextLi.classList.remove('fade-out-down'), { once: true });
+            if (isActive && Math.abs(relativeIndex) <= 2) {
+                line.dataset.lineIndex = relativeIndex;
+            } else {
+                delete line.dataset.lineIndex;
+            }
+        });
+
+        // === 2. Force Layout Flush ===
+        void lyricsLinesContainer.offsetHeight;
+
+        // === 3. Overlap Check & Final Hide (only if active) ===
+        if (isActive) {
+            const currentLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="0"]');
+            if (!currentLi) return;
+            const currRect = currentLi.getBoundingClientRect();
+
+            // Check previous line for overlap.
+            const prevLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="-1"]');
+            if (prevLi) {
+                const prevRect = prevLi.getBoundingClientRect();
+                // We can use a simpler check now since it only runs once per line change.
+                if (prevRect.bottom > currRect.top + 10) {
+                    prevLi.classList.add('move-up-more');
+                }
+            }
+
+            // Check next line for overlap.
+            const nextLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="1"]');
+            if (nextLi) {
+                const nextRect = nextLi.getBoundingClientRect();
+                if (nextRect.top < currRect.bottom - 10) {
+                    nextLi.classList.add('skip-line', 'fade-out-down');
+                    nextLi.addEventListener('animationend', () => nextLi.classList.remove('fade-out-down'), { once: true });
+                }
             }
         }
     }
