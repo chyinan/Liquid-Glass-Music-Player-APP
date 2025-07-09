@@ -671,7 +671,7 @@ body.drag-over #player-wrapper {
     flex-direction: column;
     justify-content: center;
     align-items: flex-start;
-    padding: 2rem 5vw;
+    padding: 2rem 5vw 8rem; /* Add bottom padding to push lyrics up */
     z-index: 5; /* 置于播放器之上，确保可见 */
     opacity: 0;
     transition: opacity 0.6s ease-in-out;
@@ -831,6 +831,11 @@ body.lyrics-mode-translation .lyrics-line {
     justify-content: center;
 }
 
+/* NEW: If a line in translation mode has no translation, show the original lyric instead. */
+body.lyrics-mode-translation .lyrics-line:has(.translated-lyric:empty) .original-lyric {
+    display: block;
+}
+
 /* 3. Bilingual mode has both visible by default, so no special rules needed here. */
 
 
@@ -842,6 +847,10 @@ body.lyrics-mode-translation .lyrics-line {
 .lyrics-line[data-line-index="-1"] {
     transform: translateY(-12rem) scale(0.7); /* Increased spacing */
     opacity: 0.5;
+}
+/* NEW: Special rule for tall previous lines to prevent overlap */
+.lyrics-line[data-line-index="-1"].move-up-more {
+    transform: translateY(-18rem) scale(0.7); /* Move up even more */
 }
 .lyrics-line[data-line-index="0"] { /* Current line */
     transform: translateY(0) scale(1);

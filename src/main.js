@@ -337,8 +337,19 @@ function hideLoading() {
 }
 
 function toggleLyrics() {
-    // Cycle through modes: 0 (off) -> 1 (translation) -> 2 (bilingual) -> 3 (original) -> 0 (off)
-    lyricsDisplayMode = (lyricsDisplayMode + 1) % 4;
+    const hasTranslation = parsedLyrics.some(l => l.translation);
+
+    // If there's no translation, just toggle between off (0) and original (3).
+    if (!hasTranslation) {
+        if (lyricsDisplayMode === 0) {
+            lyricsDisplayMode = 3; // From off, go to original
+        } else {
+            lyricsDisplayMode = 0; // From original, go to off
+        }
+    } else {
+        // If there IS a translation, cycle through all four modes.
+        lyricsDisplayMode = (lyricsDisplayMode + 1) % 4;
+    }
 
     const lyricsActive = lyricsDisplayMode !== 0;
 
@@ -362,22 +373,6 @@ function toggleLyrics() {
                 break;
         }
     }
-
-    // NEW: Show a friendly notice if user switches to translation-only mode but no translation exists
-    if (lyricsDisplayMode === 1) { // translation-only
-        const hasTranslation = parsedLyrics.some(l => l.translation);
-        if (!hasTranslation) {
-            noLyricsMessage.textContent = '此歌曲暂无翻译';
-            noLyricsMessage.classList.remove('hidden');
-        } else {
-            noLyricsMessage.classList.add('hidden');
-        }
-    } else {
-        // Hide the "no translation" notice when leaving translation-only mode (but keep it visible if it was the original no-lyrics message)
-        if (noLyricsMessage.textContent === '此歌曲暂无翻译') {
-            noLyricsMessage.classList.add('hidden');
-        }
-    }
     
     const settings = document.querySelector('.settings-wrapper');
     if (settings) {
@@ -387,10 +382,6 @@ function toggleLyrics() {
     // 修复：切换时立即更新歌词
     currentLyricIndex = -1;
     updateLyrics(audioPlayer.currentTime);
-
-    // Re-check marquee status after toggling lyrics mode.
-    // applyMarquee(songTitleEl);
-    // applyMarquee(artistNameEl);
 }
 
 // All marquee-related JavaScript has been removed for simplicity.
@@ -504,12 +495,15 @@ function updateLyrics(currentTime) {
         if (prevLi) {
             const prevRect = prevLi.getBoundingClientRect();
             if (prevRect.bottom > currRect.top + 10) {
-                prevLi.classList.add('skip-line', 'fade-out-up');
-                prevLi.addEventListener('animationend', () => prevLi.classList.remove('fade-out-up'), { once: true });
+                // Instead of hiding, add a class to move it up further.
+                prevLi.classList.add('move-up-more');
+            } else {
+                // If it doesn't overlap, ensure the class is removed.
+                prevLi.classList.remove('move-up-more');
             }
         }
 
-        // Check next line for overlap.
+        // Check next line for overlap (still hide it for simplicity).
         const nextLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="1"]');
         if (nextLi) {
             const nextRect = nextLi.getBoundingClientRect();
