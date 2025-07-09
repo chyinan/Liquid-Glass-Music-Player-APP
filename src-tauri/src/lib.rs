@@ -2,8 +2,7 @@ use tauri_plugin_dialog;
 use std::sync::Mutex;
 use base64::{Engine as _, engine::general_purpose};
 use lofty::file::TaggedFileExt;
-use lofty::tag::{Accessor, ItemKey, Tag};
-use lofty::id3::v2::FrameValue;
+use lofty::tag::{Accessor, ItemKey};
 use ffmpeg_sidecar::command::FfmpegCommand;
 use tempfile::{tempdir, TempDir};
 
