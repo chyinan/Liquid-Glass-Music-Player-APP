@@ -157,19 +157,19 @@ input[type="file"] { display: none; }
 
 #player-ui-distorted-bg {
     position: absolute;
-    top: 10px;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
+    top: 6px;
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
     background-size: cover;
     background-position: center;
     border-radius: 14px;
     /* Manually creating the border to fix stubborn rendering bugs */
     box-shadow: 
-        inset 6px 0 0 0 rgba(44, 44, 44, 0.9),  /* Left */
-        inset -6px 0 0 0 rgba(44, 44, 44, 0.9), /* Right */
-        inset 0 6px 0 0 rgba(44, 44, 44, 0.9),  /* Top */
-        inset 0 -6px 0 0 rgba(89, 89, 89, 0.9); /* Bottom */
+        inset 5px 0 0 0 rgba(151, 150, 150, 0.208),  /* Left */
+        inset -5px 0 0 0 rgba(151, 150, 150, 0.208), /* Right */
+        inset 0 5px 0 0 rgba(151, 150, 150, 0.208),  /* Top */
+        inset 0 -5px 0 0 rgba(151, 150, 150, 0.208); /* Bottom */
     z-index: 1;
     
     /* GPU硬件加速优化 */
@@ -441,122 +441,39 @@ input[type="file"] { display: none; }
 
 /* --- Minimal Mode Styles (New) --- */
 #player-ui-glass.minimal-mode {
+    background-color: rgba(89, 89, 89, 0.15);
+    backdrop-filter: blur(9.5px);
+    -webkit-backdrop-filter: blur(9.5px);
+    border: 0px solid rgba(255, 255, 255, 0.18);
+    box-shadow: rgba(14, 14, 14, 0.19) 0px 6px 15px 0px;
+    -webkit-box-shadow: rgba(14, 14, 14, 0.19) 0px 6px 15px 0px;
+    border-radius: 19px;
+    -webkit-border-radius: 19px;
+    color: rgba(128, 128, 128, 0.6);
+    /* 保留原有布局相关属性 */
     flex-direction: row;
     align-items: center;
     gap: 4rem;
-    padding: 4rem 6rem; /* Increased horizontal padding for better balance */
-    width: fit-content; /* Fit content with some margin */
-    min-width: 90vw; /* Increased minimum width for better presence */
-    max-width: none; /* Remove max-width constraint completely */
-    height: 60vh; /* Set a substantial height like in the reference */
-    min-height: 500px; /* Increased minimum height for better presence */
-    max-height: 80vh; /* Reasonable maximum height to prevent overflow */
-    
-    /* 增强极简模式下的边框折射效果 - 亮度已调低 */
-    border: 2px solid transparent;
-    background: 
-        linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)) padding-box, /* Main background dimmed */
-        linear-gradient(135deg, 
-            rgba(255, 255, 255, 0.6) 0%,  /* Border highlights dimmed */
-            rgba(255, 255, 255, 0.2) 25%, 
-            rgba(255, 255, 255, 0.05) 50%, 
-            rgba(255, 255, 255, 0.2) 75%, 
-            rgba(255, 255, 255, 0.6) 100%
-        ) border-box;
-    box-shadow: 
-        0 8px 32px 0 rgba(0, 0, 0, 0.37),
-        0 0 0 1px rgba(255, 255, 255, 0.08), /* Outline dimmed */
-        inset 0 2px 8px rgba(255, 255, 255, 0.3), /* Top highlight dimmed */
-        inset 2px 0 8px rgba(255, 255, 255, 0.3), /* Left highlight dimmed */
-        inset -2px 0 6px rgba(255, 255, 255, 0.15), /* Other highlights dimmed */
-        inset 0 -2px 6px rgba(255, 255, 255, 0.15),
-        inset 0 0 30px 15px rgba(255, 255, 255, 0.05), /* Inner glow dimmed */
-        0 0 25px rgba(255, 255, 255, 0.1); /* Outer glow dimmed */
-        
-    /* 添加光线折射动画 */
+    padding: 4rem 6rem 4rem 6rem;
+    width: fit-content;
+    min-width: 90vw;
+    max-width: none;
+    height: 60vh;
+    min-height: 500px;
+    max-height: 80vh;
     position: relative;
     overflow: hidden;
 }
 
-/* 添加极简模式下的光线折射线条 */
-#player-ui-glass.minimal-mode::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(
-        90deg, 
-        transparent 0%, 
-        rgba(255, 255, 255, 0.2) 20%, /* Highlight dimmed */
-        rgba(255, 255, 255, 0.6) 50%, /* Highlight dimmed */
-        rgba(255, 255, 255, 0.2) 80%, /* Highlight dimmed */
-        transparent 100%
-    );
-    border-radius: 24px 24px 0 0;
-    animation: refractLight 8s ease-in-out infinite;
-}
-
+/* 移除极简模式下的高光动画伪元素 */
+#player-ui-glass.minimal-mode::before,
 #player-ui-glass.minimal-mode::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 2px;
-    height: 100%;
-    background: linear-gradient(
-        180deg, 
-        rgba(255, 255, 255, 0.6) 0%,  /* Highlight dimmed */
-        rgba(255, 255, 255, 0.25) 30%, 
-        rgba(255, 255, 255, 0.05) 60%, 
-        rgba(255, 255, 255, 0.2) 85%, 
-        transparent 100%
-    );
-    border-radius: 24px 0 0 24px;
-    animation: refractLight 8s ease-in-out infinite reverse;
+    display: none !important;
 }
 
-/* 光线折射动画 */
-@keyframes refractLight {
-    0%, 100% {
-        opacity: 0.6;
-        transform: translateX(0px) scaleX(1);
-    }
-    25% {
-        opacity: 0.8;
-        transform: translateX(2px) scaleX(1.1);
-    }
-    50% {
-        opacity: 1;
-        transform: translateX(0px) scaleX(1.05);
-    }
-    75% {
-        opacity: 0.9;
-        transform: translateX(-1px) scaleX(1);
-    }
-}
-
-/* 在极简模式玻璃面板内添加径向高光 */
+/* 移除极简模式下visual-container的径向高光 */
 #player-ui-glass.minimal-mode #visual-container::before {
-    content: '';
-    position: absolute;
-    top: -10%;
-    left: -10%;
-    width: 120%;
-    height: 120%;
-    background: 
-        radial-gradient(
-            circle at 30% 20%, 
-            rgba(255, 255, 255, 0.15) 0%, /* Highlight dimmed */
-            rgba(255, 255, 255, 0.05) 25%, 
-            rgba(255, 255, 255, 0.01) 50%, 
-            transparent 70%
-        );
-    pointer-events: none;
-    z-index: 1;
-    border-radius: 16px;
-    mix-blend-mode: overlay;
+    display: none !important;
 }
 
 /* 确保专辑封面在高光上方 */
@@ -568,10 +485,12 @@ input[type="file"] { display: none; }
 /* 极简模式下的更强烈流动效果 (CORRECTED SELECTOR) */
 #player-wrapper:has(#player-ui-glass.minimal-mode) #player-ui-distorted-bg {
     /* Apply user's custom insets only in minimal mode */
-    top: 40px;
-    left: 40px;
-    right: 40px;
-    bottom: 70px;
+    top: 58px !important;
+    left: 58px !important;
+    right: 58px !important;
+    bottom: 58px !important;
+    width: unset !important;
+    height: unset !important;
     border-radius: 10px; /* Adjust radius for new insets */
     box-shadow: none; /* Remove the border fix in this mode */
 
@@ -926,4 +845,18 @@ body.lyrics-mode-translation .lyrics-line:has(.translated-lyric:empty) .original
     visibility: hidden !important;
     opacity: 0 !important;
     pointer-events: none !important;
+}
+
+#player-wrapper.minimal-active,
+#player-wrapper:has(#player-ui-glass.minimal-mode),
+#player-ui-distorted-bg {
+    border: none !important;
+    box-shadow: none !important;
+}
+#player-wrapper:has(#player-ui-glass.minimal-mode) #player-ui-distorted-bg {
+    border: none !important;
+    box-shadow: none !important;
+}
+#player-ui-glass.minimal-mode:focus {
+    outline: none !important;
 }
