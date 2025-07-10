@@ -2,7 +2,15 @@
 
 一款跨平台的桌面音乐播放器，采用 **Rust / Tauri v2** 打造后端，前端使用原生 **HTML + CSS + JavaScript**，并配备独特的「Liquid Glass」UI 效果。应用能自动提取音频元数据与封面、实时转码为浏览器友好的立体声 WAV，并在界面中呈现动态模糊与色彩自适应。
 
-![screenshot](./screenshot.png) <!-- 如有截图请替换 -->
+### 界面预览
+
+| 普通模式 | 极简模式 (Liquid Glass) |
+|:---:|:---:|
+| ![普通模式](./screenshot.png) | ![极简模式](./screenshot2.png) |
+| **纯译文模式** | **双语（上原下译）** |
+| ![纯译文模式](./screenshot3.png) | ![双语（上原下译）](./screenshot4.png) |
+| **双语（上译下原）** | **纯原文模式** |
+| ![双语（上译下原）](./screenshot5.png) | ![纯原文模式](./screenshot6.png) |
 
 ---
 
