@@ -1,5 +1,9 @@
 # Immersive Music Player (Rust + Tauri v2 版)
 
+<p align="center">
+  <img src="./app-icon.png" alt="App Icon" width="200"/>
+</p>
+
 一款跨平台的桌面音乐播放器，采用 **Rust / Tauri v2** 打造后端，前端使用原生 **HTML + CSS + JavaScript**，并配备独特的「Liquid Glass」UI 效果。应用能自动提取音频元数据与封面、实时转码为浏览器友好的立体声 WAV，并在界面中呈现动态模糊与色彩自适应。
 
 ### 界面预览
