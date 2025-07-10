@@ -38,6 +38,12 @@ body {
     justify-content: center;
     min-height: 100vh;
     overflow: hidden;
+
+    /* FINAL FIX: Force stable hardware acceleration context for the entire page to prevent flickering on complex animations */
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
 }
 
 /* --- Blurred Background --- */
@@ -58,6 +64,8 @@ body {
     will-change: transform, background-position, opacity;
     transform: translateZ(0.003px); /* 独立的复合层ID */
     backface-visibility: hidden;
+    transform-style: preserve-3d; /* NEW: Create a more stable 3D rendering context */
+    perspective: 1000px; /* NEW: Provide perspective for the 3D context */
     
     /* 添加更慢的背景流动效果 */
     animation: slowBackgroundFlow 120s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
@@ -65,6 +73,11 @@ body {
 
 #background-blur.active {
     opacity: 1;
+}
+
+/* NEW: When in minimal mode, make the main background flow more intensely */
+body:has(#player-ui-glass.minimal-mode) #background-blur {
+    animation: enhancedFlowingBackground 90s cubic-bezier(0.42, 0, 0.58, 1.0) infinite;
 }
 
 /* --- Main Container --- */
@@ -441,15 +454,15 @@ input[type="file"] { display: none; }
 
 /* --- Minimal Mode Styles (New) --- */
 #player-ui-glass.minimal-mode {
-    background-color: rgba(89, 89, 89, 0.15);
-    backdrop-filter: blur(9.5px);
-    -webkit-backdrop-filter: blur(9.5px);
-    border: 0px solid rgba(255, 255, 255, 0.18);
-    box-shadow: rgba(14, 14, 14, 0.19) 0px 6px 15px 0px;
-    -webkit-box-shadow: rgba(14, 14, 14, 0.19) 0px 6px 15px 0px;
-    border-radius: 19px;
-    -webkit-border-radius: 19px;
-    color: rgba(128, 128, 128, 0.6);
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(2px) saturate(180%);
+    -webkit-backdrop-filter: blur(2px) saturate(180%);
+    border: none; /* Remove hard border to prevent aliasing */
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2), 
+                inset 0 4px 20px rgba(255, 255, 255, 0.3),
+                inset 0 0 1.5px rgba(255, 255, 255, 0.5); /* Add soft inner shadow for a smoother border */
+    border-radius: 2rem;
+    color: white;
     /* 保留原有布局相关属性 */
     flex-direction: row;
     align-items: center;
@@ -466,9 +479,29 @@ input[type="file"] { display: none; }
 }
 
 /* 移除极简模式下的高光动画伪元素 */
-#player-ui-glass.minimal-mode::before,
-#player-ui-glass.minimal-mode::after {
+#player-ui-glass.minimal-mode::before {
     display: none !important;
+}
+
+/* Liquid glass effect from example */
+#player-ui-glass.minimal-mode::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+    /* Simplified shadow for smoother highlights */
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), inset 0 -1px 1px rgba(255, 255, 255, 0.3);
+    opacity: 0.8; /* Increased opacity slightly for the new subtle effect */
+    z-index: -1;
+    /* Removed blur from filter as it's no longer needed to soften edges */
+    filter: drop-shadow(10px 4px 6px black) brightness(115%);
+    pointer-events: none;
 }
 
 /* 移除极简模式下visual-container的径向高光 */
@@ -484,25 +517,7 @@ input[type="file"] { display: none; }
 
 /* 极简模式下的更强烈流动效果 (CORRECTED SELECTOR) */
 #player-wrapper:has(#player-ui-glass.minimal-mode) #player-ui-distorted-bg {
-    /* Apply user's custom insets only in minimal mode */
-    top: 58px !important;
-    left: 58px !important;
-    right: 58px !important;
-    bottom: 58px !important;
-    width: unset !important;
-    height: unset !important;
-    border-radius: 10px; /* Adjust radius for new insets */
-    box-shadow: none; /* Remove the border fix in this mode */
-
-    animation: enhancedFlowingBackground 300s cubic-bezier(0.42, 0.0, 0.58, 1.0) infinite;
-    background-size: cover; /* 保持原始比例，避免人脸等图像被拉伸变形 */
-    
-    /* 极简模式下的强化GPU优化 */
-    will-change: transform, background-position;
-    transform: translateZ(0.004px); /* 为极简模式创建专用复合层 */
-    backface-visibility: hidden;
-    perspective: 2000px; /* 增强3D渲染性能 */
-    transform-style: preserve-3d; /* 保持3D变换上下文 */
+    display: none; /* Hide the distorted background layer in minimal mode as requested */
 }
 
 #player-ui-glass.minimal-mode #visual-container {
@@ -755,7 +770,38 @@ body.lyrics-mode-translation .lyrics-line:has(.translated-lyric:empty) .original
     display: block;
 }
 
-/* 3. Bilingual mode has both visible by default, so no special rules needed here. */
+/* 3. Bilingual (Original/Translation) mode has both visible by default, so no special rules needed here. */
+
+
+/* 4. Bilingual Reversed (Translation/Original) Mode (NEW) */
+body.lyrics-mode-bilingual-reversed .lyrics-line {
+    flex-direction: column-reverse; /* Swap the visual order */
+}
+/* Make the translated lyric (now on top) the prominent one */
+body.lyrics-mode-bilingual-reversed .translated-lyric {
+    font-size: 4.0rem;
+    opacity: 1;
+    padding-left: 0; /* Reset indent */
+}
+/* Make the original lyric (now on bottom) the secondary one */
+body.lyrics-mode-bilingual-reversed .original-lyric {
+    font-size: 2.2rem;
+    opacity: 0.8;
+    padding-left: 0.4rem; /* Add indent */
+}
+/* Handle lines with no translation in reversed mode by showing original in full size */
+body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) {
+    flex-direction: column; /* Revert to normal flex order */
+    justify-content: center; /* Center the single line */
+}
+body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .original-lyric {
+    font-size: 4.0rem; /* Upscale the original lyric */
+    opacity: 1;
+    padding-left: 0;
+}
+body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .translated-lyric {
+    display: none;
+}
 
 
 /* Define positions and styles for 5 lines - NOW WITH SCALE() and corrected REM-based translation */

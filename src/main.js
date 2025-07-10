@@ -39,7 +39,7 @@ loadingOverlay.classList.add('ui-hidden');
 let parsedLyrics = [];
 let currentLyricIndex = -1;
 // NEW: State for lyrics display mode
-// 0: off, 1: translation only, 2: bilingual, 3: original only
+// 0: off, 1: translation only, 2: bilingual (orig/trans), 3: bilingual-reversed (trans/orig), 4: original only
 let lyricsDisplayMode = 0;
 
 // === 颜色工具函数和自适应主题 ===
@@ -309,7 +309,7 @@ window.addEventListener('keydown', (event) => {
             // 在进入极简模式前，如果歌词模式是激活的，则先退出歌词模式
             if (lyricsDisplayMode !== 0) { // Check against the new state
                 // Set mode to the last state (original) so the next toggle turns it off.
-                lyricsDisplayMode = 3; 
+                lyricsDisplayMode = 4; 
                 toggleLyrics(); // This will now cycle to 0 (off) and update the UI correctly.
             }
             // 切换极简模式
@@ -339,16 +339,16 @@ function hideLoading() {
 function toggleLyrics() {
     const hasTranslation = parsedLyrics.some(l => l.translation);
 
-    // If there's no translation, just toggle between off (0) and original (3).
+    // If there's no translation, just toggle between off (0) and original (4).
     if (!hasTranslation) {
         if (lyricsDisplayMode === 0) {
-            lyricsDisplayMode = 3; // From off, go to original
+            lyricsDisplayMode = 4; // From off, go to original
         } else {
             lyricsDisplayMode = 0; // From original, go to off
         }
     } else {
-        // If there IS a translation, cycle through all four modes.
-        lyricsDisplayMode = (lyricsDisplayMode + 1) % 4;
+        // If there IS a translation, cycle through all five modes.
+        lyricsDisplayMode = (lyricsDisplayMode + 1) % 5;
     }
 
     const lyricsActive = lyricsDisplayMode !== 0;
@@ -357,7 +357,7 @@ function toggleLyrics() {
     lyricsContainer.classList.toggle('hidden', !lyricsActive);
 
     // Remove all mode classes before adding the new one
-    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-original');
+    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original');
 
     if (lyricsActive) {
         document.body.classList.add('lyrics-active');
@@ -365,10 +365,13 @@ function toggleLyrics() {
             case 1: // Translation only
                 document.body.classList.add('lyrics-mode-translation');
                 break;
-            case 2: // Bilingual
+            case 2: // Bilingual (orig/trans)
                 document.body.classList.add('lyrics-mode-bilingual');
                 break;
-            case 3: // Original only
+            case 3: // Bilingual (trans/orig)
+                document.body.classList.add('lyrics-mode-bilingual-reversed');
+                break;
+            case 4: // Original only
                 document.body.classList.add('lyrics-mode-original');
                 break;
         }
