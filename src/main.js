@@ -499,8 +499,8 @@ function updateLyrics(currentTime) {
             const line0 = getLineByRelIdx(0);
             if (!line0) return;
 
-            // Define a base gap.
-            const baseGap = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2.5; // Base gap in pixels
+            // Define a base gap, reduced for a more pronounced dynamic effect.
+            const baseGap = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2.0; 
 
             // Set current line's position
             line0.style.setProperty('--translate-y', '0px');
@@ -511,8 +511,8 @@ function updateLyrics(currentTime) {
 
             const line1 = getLineByRelIdx(1);
             if (line1) {
-                // NEW: Dynamic gap based on the average height of the two lines
-                const dynamicGap = baseGap + (lastLine.offsetHeight + line1.offsetHeight) / 2 * 0.15;
+                // NEW: Dynamic gap based on the SUM of heights for a stronger effect
+                const dynamicGap = baseGap + (lastLine.offsetHeight + line1.offsetHeight) * 0.15;
                 const distance = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line1.offsetHeight / 2) * getScale(line1) + dynamicGap;
                 const translateY = lastTranslateY + distance;
                 line1.style.setProperty('--translate-y', `${translateY}px`);
@@ -522,7 +522,7 @@ function updateLyrics(currentTime) {
                 
                 const line2 = getLineByRelIdx(2);
                 if (line2) {
-                    const dynamicGap2 = baseGap + (lastLine.offsetHeight + line2.offsetHeight) / 2 * 0.15;
+                    const dynamicGap2 = baseGap + (lastLine.offsetHeight + line2.offsetHeight) * 0.15;
                     const distance2 = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line2.offsetHeight / 2) * getScale(line2) + dynamicGap2;
                     const translateY2 = lastTranslateY + distance2;
                     line2.style.setProperty('--translate-y', `${translateY2}px`);
@@ -535,7 +535,7 @@ function updateLyrics(currentTime) {
 
             const line_minus_1 = getLineByRelIdx(-1);
             if (line_minus_1) {
-                const dynamicGap = baseGap + (lastLine.offsetHeight + line_minus_1.offsetHeight) / 2 * 0.15;
+                const dynamicGap = baseGap + (lastLine.offsetHeight + line_minus_1.offsetHeight) * 0.15;
                 const distance = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line_minus_1.offsetHeight / 2) * getScale(line_minus_1) + dynamicGap;
                 const translateY = lastTranslateY - distance;
                 line_minus_1.style.setProperty('--translate-y', `${translateY}px`);
@@ -545,7 +545,7 @@ function updateLyrics(currentTime) {
 
                 const line_minus_2 = getLineByRelIdx(-2);
                 if (line_minus_2) {
-                    const dynamicGap2 = baseGap + (lastLine.offsetHeight + line_minus_2.offsetHeight) / 2 * 0.15;
+                    const dynamicGap2 = baseGap + (lastLine.offsetHeight + line_minus_2.offsetHeight) * 0.15;
                     const distance2 = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line_minus_2.offsetHeight / 2) * getScale(line_minus_2) + dynamicGap2;
                     const translateY2 = lastTranslateY - distance2;
                     line_minus_2.style.setProperty('--translate-y', `${translateY2}px`);
