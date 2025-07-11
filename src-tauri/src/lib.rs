@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use std::process::Command;
 use tempfile::tempdir;
 use encoding_rs::{GBK, UTF_16LE};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 #[derive(Deserialize, Debug)]
 struct FFProbeOutput {
@@ -57,16 +59,20 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
         .map_err(|e| format!("Failed to download ffmpeg: {}", e))?;
 
     // 2. Run ffprobe to get metadata
-    let ffprobe_output = Command::new("ffprobe")
-        .arg("-v")
+    let mut ffprobe_cmd = Command::new("ffprobe");
+    ffprobe_cmd.arg("-v")
         .arg("quiet")
         .arg("-print_format")
         .arg("json")
         .arg("-show_format")
         .arg("-show_streams")
         .arg("-i")
-        .arg(&path)
-        .output()
+        .arg(&path);
+    
+    #[cfg(windows)]
+    ffprobe_cmd.creation_flags(0x08000000);
+
+    let ffprobe_output = ffprobe_cmd.output()
         .map_err(|e| format!("Failed to execute ffprobe: {}", e))?;
 
     let mut metadata = Metadata {
@@ -189,14 +195,22 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
     // 3. Extract album art using ffmpeg
     let temp_dir_art = tempdir().map_err(|e| format!("Failed to create temp dir for art: {}", e))?;
     let art_output_path = temp_dir_art.path().join("cover.jpg");
-    let art_output = Command::new("ffmpeg")
+
+    let mut art_cmd = Command::new("ffmpeg");
+    art_cmd.arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("error")
         .arg("-i")
         .arg(&path)
         .arg("-an") // no audio
         .arg("-vcodec")
         .arg("copy")
-        .arg(art_output_path.to_str().unwrap())
-        .output();
+        .arg(art_output_path.to_str().unwrap());
+
+    #[cfg(windows)]
+    art_cmd.creation_flags(0x08000000);
+
+    let art_output = art_cmd.output();
 
     let mut album_art_base64 = None;
     if let Ok(output) = art_output {
@@ -211,14 +225,21 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
     let temp_dir_wav = tempdir().map_err(|e| format!("Failed to create temp dir for wav: {}", e))?;
     let wav_output_path = temp_dir_wav.path().join("playback.wav");
 
-    let wav_status = Command::new("ffmpeg")
+    let mut wav_cmd = Command::new("ffmpeg");
+    wav_cmd.arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("error")
         .arg("-i")
         .arg(&path)
         .arg("-ac")
         .arg("2")
         .arg("-y")
-        .arg(wav_output_path.to_str().unwrap())
-        .status()
+        .arg(wav_output_path.to_str().unwrap());
+
+    #[cfg(windows)]
+    wav_cmd.creation_flags(0x08000000);
+        
+    let wav_status = wav_cmd.status()
         .map_err(|e| format!("ffmpeg command for wav failed to run: {}", e))?;
 
     if !wav_status.success() {
