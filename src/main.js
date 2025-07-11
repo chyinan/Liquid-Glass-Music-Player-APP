@@ -19,6 +19,7 @@ const audioPlayer = document.getElementById('audioPlayer');
     const artistNameEl = document.getElementById('artistName');
     const songTitleEl = document.getElementById('songTitle');
 
+    const progressBarContainer = document.getElementById('progress-bar-container');
     const progressBarFill = document.getElementById('progress-bar-fill');
     const currentTimeEl = document.getElementById('current-time');
     const durationEl = document.getElementById('duration');
@@ -34,6 +35,7 @@ loadingOverlay.classList.add('ui-hidden');
 
 // State
     let isPlaying = false;
+    let isSeeking = false;
     let artworkUrl = null;
 // This old variable was causing the issue. It's now removed.
 let parsedLyrics = [];
@@ -233,6 +235,7 @@ audioPlayer.addEventListener('loadedmetadata', () => {
 });
 
 audioPlayer.addEventListener('timeupdate', () => {
+    if (isSeeking) return; // 拖动时不更新
     currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
     const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
         progressBarFill.style.width = `${progress}%`;
@@ -252,6 +255,40 @@ audioPlayer.addEventListener('timeupdate', () => {
         console.error("Error opening file dialog", e);
         }
     });
+
+// --- 进度条拖动逻辑 ---
+function seek(e) {
+    if (audioPlayer.duration) {
+        const rect = progressBarContainer.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const width = progressBarContainer.clientWidth;
+        const progress = Math.max(0, Math.min(1, offsetX / width));
+        
+        const newTime = progress * audioPlayer.duration;
+        audioPlayer.currentTime = newTime;
+
+        // 拖动时立即手动更新UI
+        progressBarFill.style.width = `${progress * 100}%`;
+        currentTimeEl.textContent = formatTime(newTime);
+    }
+}
+
+progressBarContainer.addEventListener('mousedown', (e) => {
+    isSeeking = true;
+    seek(e); // 立即跳转到点击位置
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (isSeeking) {
+        // 使用 requestAnimationFrame 优化性能，避免过于频繁的更新
+        requestAnimationFrame(() => seek(e));
+    }
+});
+
+document.addEventListener('mouseup', () => {
+    isSeeking = false;
+});
+
 
 const currentWindow = appWindow;
     currentWindow.onDragDropEvent(async (evt) => {
