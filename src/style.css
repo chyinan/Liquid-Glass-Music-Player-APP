@@ -701,6 +701,8 @@ body.lyrics-active .progress-bar-container.simple {
     );
 }
 
+/* 定义positions和styles，共5行。
+   Transforms are now handled dynamically in JS for consistent spacing. */
 .lyrics-line {
     font-weight: 600;
     line-height: 1.4; /* Adjusted for better multi-line spacing */
@@ -715,6 +717,11 @@ body.lyrics-active .progress-bar-container.simple {
     flex-direction: column;
     align-items: flex-start; /* Align text to the left */
     gap: 0.5rem; /* Space between original and translation */
+
+    /* NEW: Use CSS variables for dynamic transforms from JS */
+    --translate-y: 0px;
+    --scale: 0.5;
+    transform: translateY(var(--translate-y)) scale(var(--scale));
 }
 
 /* Base style for both lyric lines */
@@ -804,30 +811,26 @@ body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .t
 }
 
 
-/* Define positions and styles for 5 lines - NOW WITH SCALE() and corrected REM-based translation */
+/* Define positions and styles for 5 lines - NOW WITH DYNAMIC TRANSFORMS */
 .lyrics-line[data-line-index="-2"] {
-    transform: translateY(-24rem) scale(0.55); /* Increased spacing */
+    --scale: 0.55;
     opacity: 0.2;
 }
 .lyrics-line[data-line-index="-1"] {
-    transform: translateY(-12rem) scale(0.7); /* Increased spacing */
+    --scale: 0.7;
     opacity: 0.5;
 }
-/* NEW: Special rule for tall previous lines to prevent overlap */
-.lyrics-line[data-line-index="-1"].move-up-more {
-    transform: translateY(-18rem) scale(0.7); /* Move up even more */
-}
 .lyrics-line[data-line-index="0"] { /* Current line */
-    transform: translateY(0) scale(1);
+    --scale: 1;
     opacity: 1;
     color: var(--accent-color);
 }
 .lyrics-line[data-line-index="1"] {
-    transform: translateY(12rem) scale(0.7); /* Increased spacing */
+    --scale: 0.7;
     opacity: 0.5;
 }
 .lyrics-line[data-line-index="2"] {
-    transform: translateY(24rem) scale(0.55); /* Increased spacing */
+    --scale: 0.55;
     opacity: 0.2;
 }
 

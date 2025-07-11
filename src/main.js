@@ -485,29 +485,70 @@ function updateLyrics(currentTime) {
         // === 2. Force Layout Flush ===
         void lyricsLinesContainer.offsetHeight;
 
-        // === 3. Overlap Check & Final Hide (only if active) ===
+        // === 3. DYNAMICALLY SET TRANSFORMS (NEW LOGIC) ===
         if (isActive) {
-            const currentLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="0"]');
-            if (!currentLi) return;
-            const currRect = currentLi.getBoundingClientRect();
+            const getLineByRelIdx = (idx) => lyricsLinesContainer.querySelector(`.lyrics-line[data-line-index="${idx}"]`);
+            
+            // Utility to get the computed scale for a line
+            const getScale = (el) => {
+                if (!el) return 0;
+                // We can get the CSS variable value.
+                return parseFloat(getComputedStyle(el).getPropertyValue('--scale'));
+            };
 
-            // Check previous line for overlap.
-            const prevLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="-1"]');
-            if (prevLi) {
-                const prevRect = prevLi.getBoundingClientRect();
-                // We can use a simpler check now since it only runs once per line change.
-                if (prevRect.bottom > currRect.top + 10) {
-                    prevLi.classList.add('move-up-more');
+            const line0 = getLineByRelIdx(0);
+            if (!line0) return;
+
+            // Define a base gap.
+            const baseGap = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2.5; // Base gap in pixels
+
+            // Set current line's position
+            line0.style.setProperty('--translate-y', '0px');
+            
+            // --- Calculate positions downwards ---
+            let lastLine = line0;
+            let lastTranslateY = 0;
+
+            const line1 = getLineByRelIdx(1);
+            if (line1) {
+                // NEW: Dynamic gap based on the average height of the two lines
+                const dynamicGap = baseGap + (lastLine.offsetHeight + line1.offsetHeight) / 2 * 0.15;
+                const distance = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line1.offsetHeight / 2) * getScale(line1) + dynamicGap;
+                const translateY = lastTranslateY + distance;
+                line1.style.setProperty('--translate-y', `${translateY}px`);
+
+                lastLine = line1;
+                lastTranslateY = translateY;
+                
+                const line2 = getLineByRelIdx(2);
+                if (line2) {
+                    const dynamicGap2 = baseGap + (lastLine.offsetHeight + line2.offsetHeight) / 2 * 0.15;
+                    const distance2 = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line2.offsetHeight / 2) * getScale(line2) + dynamicGap2;
+                    const translateY2 = lastTranslateY + distance2;
+                    line2.style.setProperty('--translate-y', `${translateY2}px`);
                 }
             }
 
-            // Check next line for overlap.
-            const nextLi = lyricsLinesContainer.querySelector('.lyrics-line[data-line-index="1"]');
-            if (nextLi) {
-                const nextRect = nextLi.getBoundingClientRect();
-                if (nextRect.top < currRect.bottom - 10) {
-                    nextLi.classList.add('skip-line', 'fade-out-down');
-                    nextLi.addEventListener('animationend', () => nextLi.classList.remove('fade-out-down'), { once: true });
+            // --- Calculate positions upwards ---
+            lastLine = line0;
+            lastTranslateY = 0;
+
+            const line_minus_1 = getLineByRelIdx(-1);
+            if (line_minus_1) {
+                const dynamicGap = baseGap + (lastLine.offsetHeight + line_minus_1.offsetHeight) / 2 * 0.15;
+                const distance = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line_minus_1.offsetHeight / 2) * getScale(line_minus_1) + dynamicGap;
+                const translateY = lastTranslateY - distance;
+                line_minus_1.style.setProperty('--translate-y', `${translateY}px`);
+
+                lastLine = line_minus_1;
+                lastTranslateY = translateY;
+
+                const line_minus_2 = getLineByRelIdx(-2);
+                if (line_minus_2) {
+                    const dynamicGap2 = baseGap + (lastLine.offsetHeight + line_minus_2.offsetHeight) / 2 * 0.15;
+                    const distance2 = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line_minus_2.offsetHeight / 2) * getScale(line_minus_2) + dynamicGap2;
+                    const translateY2 = lastTranslateY - distance2;
+                    line_minus_2.style.setProperty('--translate-y', `${translateY2}px`);
                 }
             }
         }
