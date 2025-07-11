@@ -49,9 +49,6 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
         .map_err(|e| format!("Failed to decode path: {}", e))?
         .into_owned();
 
-    #[cfg(debug_assertions)]
-    eprintln!("[DEBUG] decoded path: {}", path_decoded);
-
     let path = path_decoded;
 
     // 1. Download ffmpeg/ffprobe if not already present.
@@ -115,7 +112,22 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
 
             metadata.title = combined_tags.get("title").cloned();
             metadata.artist = combined_tags.get("artist").or_else(|| combined_tags.get("ARTIST")).cloned();
-            lyrics = combined_tags.get("lyrics").or_else(|| combined_tags.get("LYRICS")).cloned();
+            // 1) Try common keys
+            lyrics = combined_tags
+                .get("lyrics")
+                .or_else(|| combined_tags.get("LYRICS"))
+                .cloned();
+
+            // 2) If still none, search for any key that starts with "lyrics" (case-insensitive),
+            //    e.g. "lyrics-XXX" which is often produced by some DAWs.
+            if lyrics.is_none() {
+                for (k, v) in &combined_tags {
+                    if k.to_lowercase().starts_with("lyrics") {
+                        lyrics = Some(v.clone());
+                        break;
+                    }
+                }
+            }
 
             // If ffprobe returns an empty or whitespace-only string for title or artist, treat it as missing.
             if metadata
@@ -126,10 +138,13 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
             {
                 metadata.title = None;
             }
-            if let Some(ref a) = metadata.artist {
-                if a.trim().is_empty() {
-                    metadata.artist = None;
-                }
+            if metadata
+                .artist
+                .as_ref()
+                .map(|a| a.trim().is_empty() || a.contains('\u{FFFD}'))
+                .unwrap_or(false)
+            {
+                metadata.artist = None;
             }
 
         } else {
@@ -143,17 +158,32 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
     }
     
     // Fallback if title or artist is still None
-    if metadata.title.is_none() {
-        if let Some(file_stem) = std::path::Path::new(&path).file_stem() {
-            #[cfg(debug_assertions)]
-            eprintln!("[DEBUG] file_stem (OsStr): {:?}", file_stem);
-            metadata.title = Some(file_stem.to_string_lossy().to_string());
-        }
-    }
+    if let Some(file_stem_os) = std::path::Path::new(&path).file_stem() {
+        let file_stem_str = file_stem_os.to_string_lossy();
 
-    #[cfg(debug_assertions)]
-    if let Some(ref t) = metadata.title {
-        eprintln!("[DEBUG] final metadata.title: {}", t);
+        // Fallback for title
+        if metadata.title.is_none() {
+            metadata.title = Some(file_stem_str.to_string());
+        }
+
+        // If artist missing or invalid, and filename contains dash, attempt to parse "artist - title"
+        if metadata.artist.is_none() {
+            let parts: Vec<&str> = file_stem_str
+                .split('-')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if parts.len() >= 2 {
+                metadata.artist = Some(parts[0].to_string());
+
+                // If our title still等于整个文件名，把它替换为去掉 artist 的剩余部分
+                if let Some(ref t) = metadata.title {
+                    if t == &file_stem_str {
+                        metadata.title = Some(parts[1..].join(" - "));
+                    }
+                }
+            }
+        }
     }
 
     // 3. Extract album art using ffmpeg
