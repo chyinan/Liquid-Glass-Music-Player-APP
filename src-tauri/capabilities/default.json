@@ -8,9 +8,9 @@
   "permissions": [
     "dialog:default",
     "allow-process-audio-file",
-    "fs:default",
+    "default",
     "allow-read-all-files",
-    "fs:allow-temp-read-recursive",
+    "allow-temp-read-recursive",
     "core:event:default"
   ]
 }

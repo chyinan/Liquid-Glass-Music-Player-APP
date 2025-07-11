@@ -2,4 +2,20 @@
 identifier = "allow-read-all-files"
 description = "Allow reading all files"
 [[scope.allow]]
-path = "**/*" 
+path = "**/*"
+
+# This permission was referenced but not defined.
+# I'm defining it here to allow full access to the temp directory for ffmpeg.
+[[permission]]
+identifier = "default"
+description = "Default file system permissions for temp dir"
+[[scope.allow]]
+path = "$temp/**"
+
+# This permission was also referenced but not defined.
+# It seems redundant given the one above, but defining it to be safe.
+[[permission]]
+identifier = "allow-temp-read-recursive"
+description = "Allow reading recursively from the temp directory"
+[[scope.allow]]
+path = "$temp/**" 

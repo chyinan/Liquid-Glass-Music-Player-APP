@@ -140,7 +140,7 @@ async function handleFile(filePath) {
         noLyricsMessage.classList.add('hidden');
         currentLyricIndex = -1;
         
-        const result = await invoke('process_audio_file', { path: filePath });
+        const result = await invoke('process_audio_file', { path: encodeURIComponent(filePath) });
         console.log('处理结果:', result);
 
         if (result.lyrics) {

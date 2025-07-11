@@ -1,17 +1,31 @@
-use tauri_plugin_dialog;
-use std::sync::Mutex;
-use base64::{Engine as _, engine::general_purpose};
-use lofty::file::TaggedFileExt;
-use lofty::tag::{Accessor, ItemKey};
-use ffmpeg_sidecar::command::FfmpegCommand;
-use tempfile::{tempdir, TempDir};
+use base64::{engine::general_purpose, Engine as _};
+use serde::Deserialize;
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::process::Command;
+use tempfile::tempdir;
+use encoding_rs::{GBK, UTF_16LE};
 
-// A lazy_static Mutex is no longer needed with this approach, 
-// but we still need to manage the TempDir.
-// We'll manage it inside the command and rely on RAII to clean it up when the app closes,
-// though for a more robust app we might want a more sophisticated cleanup strategy.
-#[allow(dead_code)]
-static TEMP_DIR_HANDLE: Mutex<Option<TempDir>> = Mutex::new(None);
+#[derive(Deserialize, Debug)]
+struct FFProbeOutput {
+    streams: Vec<Stream>,
+    format: Format,
+}
+
+#[derive(Deserialize, Debug)]
+struct Stream {
+    codec_type: String,
+    // The `tags` field might be missing if there are no tags.
+    #[serde(default)]
+    tags: HashMap<String, String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct Format {
+    // The `tags` field might be missing if there are no tags.
+    #[serde(default)]
+    tags: HashMap<String, String>,
+}
 
 #[derive(serde::Serialize, Clone)]
 struct Metadata {
@@ -30,71 +44,161 @@ struct ProcessedFile {
 
 #[tauri::command]
 fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
-    let tag = lofty::read_from_path(&path)
-        .map_err(|e| e.to_string())?
-        .primary_tag()
-        .cloned();
+    // Decode the URL-encoded path received from the frontend to prevent corruption.
+    let path_decoded = urlencoding::decode(&path)
+        .map_err(|e| format!("Failed to decode path: {}", e))?
+        .into_owned();
+
+    #[cfg(debug_assertions)]
+    eprintln!("[DEBUG] decoded path: {}", path_decoded);
+
+    let path = path_decoded;
+
+    // 1. Download ffmpeg/ffprobe if not already present.
+    // This also adds the binaries to the PATH for the current process.
+    ffmpeg_sidecar::download::auto_download()
+        .map_err(|e| format!("Failed to download ffmpeg: {}", e))?;
+
+    // 2. Run ffprobe to get metadata
+    let ffprobe_output = Command::new("ffprobe")
+        .arg("-v")
+        .arg("quiet")
+        .arg("-print_format")
+        .arg("json")
+        .arg("-show_format")
+        .arg("-show_streams")
+        .arg("-i")
+        .arg(&path)
+        .output()
+        .map_err(|e| format!("Failed to execute ffprobe: {}", e))?;
 
     let mut metadata = Metadata {
         title: None,
         artist: None,
-        mime_type: None,
+        mime_type: Some("image/jpeg".to_string()), // Default, might be overwritten
     };
-
-    let mut album_art_base64 = None;
     let mut lyrics = None;
 
-    if let Some(t) = tag {
-        metadata.title = t.title().map(|s| s.to_string());
-        metadata.artist = t.artist().map(|s| s.to_string());
+    if ffprobe_output.status.success() {
+        // Here we attempt to decode the output from ffprobe.
+        // The output could be in UTF-8, UTF-16 (on Windows), or a legacy
+        // codepage like GBK (on Chinese Windows systems). We try them in order.
+        let ffprobe_json: Cow<'_, str> = 
+            // 1. Try UTF-8 first.
+            if let Ok(s) = std::str::from_utf8(&ffprobe_output.stdout) {
+                Cow::Borrowed(s)
+            } else {
+                // 2. If not UTF-8, try UTF-16LE.
+                let (decoded_utf16, _, had_errors_utf16) = UTF_16LE.decode(&ffprobe_output.stdout);
+                if !had_errors_utf16 {
+                    // If decoding as UTF-16LE had no errors, it was likely the correct encoding.
+                    decoded_utf16
+                } else {
+                    // 3. If UTF-16LE also had errors, fall back to GBK as the last resort.
+                    let (decoded_gbk, _, had_errors_gbk) = GBK.decode(&ffprobe_output.stdout);
+                    if had_errors_gbk {
+                        eprintln!("[WARN] Failed to decode metadata as UTF-8, UTF-16LE, or GBK. Some characters may be incorrect.");
+                    }
+                    decoded_gbk
+                }
+            };
 
-        if let Some(picture) = t.pictures().first() {
-            if let Some(mime) = picture.mime_type() {
-                metadata.mime_type = Some(mime.to_string());
+        if let Ok(probe_data) = serde_json::from_str::<FFProbeOutput>(&ffprobe_json) {
+            // Combine tags from format and streams (sometimes metadata is in one or the other)
+            let mut combined_tags = probe_data.format.tags;
+            for stream in probe_data.streams {
+                if stream.codec_type == "audio" {
+                    combined_tags.extend(stream.tags);
+                    break; // Assume first audio stream is the one we want
+                }
             }
-            album_art_base64 = Some(general_purpose::STANDARD.encode(picture.data()));
+
+            metadata.title = combined_tags.get("title").cloned();
+            metadata.artist = combined_tags.get("artist").or_else(|| combined_tags.get("ARTIST")).cloned();
+            lyrics = combined_tags.get("lyrics").or_else(|| combined_tags.get("LYRICS")).cloned();
+
+            // If ffprobe returns an empty or whitespace-only string for title or artist, treat it as missing.
+            if metadata
+                .title
+                .as_ref()
+                .map(|t| t.trim().is_empty() || t.contains('\u{FFFD}'))
+                .unwrap_or(false)
+            {
+                metadata.title = None;
+            }
+            if let Some(ref a) = metadata.artist {
+                if a.trim().is_empty() {
+                    metadata.artist = None;
+                }
+            }
+
+        } else {
+            eprintln!("Failed to parse ffprobe JSON output.");
         }
-        
-        // FINAL ATTEMPT: Simplified lyrics extraction using the generic ItemKey::Lyrics
-        // This avoids all version-specific Id3v2 logic that was causing compilation errors.
-        if let Some(lyrics_item) = t.get(&ItemKey::Lyrics) {
-            // Using .text() as hinted by a previous compiler error message
-            if let Some(lyrics_text) = lyrics_item.value().text() {
-                 lyrics = Some(lyrics_text.to_string());
+    } else {
+        eprintln!(
+            "ffprobe exited with non-zero status: {}",
+            String::from_utf8_lossy(&ffprobe_output.stderr)
+        );
+    }
+    
+    // Fallback if title or artist is still None
+    if metadata.title.is_none() {
+        if let Some(file_stem) = std::path::Path::new(&path).file_stem() {
+            #[cfg(debug_assertions)]
+            eprintln!("[DEBUG] file_stem (OsStr): {:?}", file_stem);
+            metadata.title = Some(file_stem.to_string_lossy().to_string());
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    if let Some(ref t) = metadata.title {
+        eprintln!("[DEBUG] final metadata.title: {}", t);
+    }
+
+    // 3. Extract album art using ffmpeg
+    let temp_dir_art = tempdir().map_err(|e| format!("Failed to create temp dir for art: {}", e))?;
+    let art_output_path = temp_dir_art.path().join("cover.jpg");
+    let art_output = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(&path)
+        .arg("-an") // no audio
+        .arg("-vcodec")
+        .arg("copy")
+        .arg(art_output_path.to_str().unwrap())
+        .output();
+
+    let mut album_art_base64 = None;
+    if let Ok(output) = art_output {
+        if output.status.success() {
+            if let Ok(art_data) = std::fs::read(&art_output_path) {
+                album_art_base64 = Some(general_purpose::STANDARD.encode(&art_data));
             }
         }
     }
-    
-    let temp_dir = tempdir().map_err(|e| format!("Failed to create temp dir: {}", e))?;
-    let output_path = temp_dir.path().join("playback.wav");
-    
-    // In ffmpeg-sidecar v2, the `ffmpeg` command itself will handle downloading
-    // FFmpeg if it's not found, thanks to the `download_ffmpeg` feature.
-    let output_path_str = output_path.to_str().ok_or("Invalid output path")?.to_string();
 
-    let status = FfmpegCommand::new()
+    // 4. Transcode audio to WAV for playback
+    let temp_dir_wav = tempdir().map_err(|e| format!("Failed to create temp dir for wav: {}", e))?;
+    let wav_output_path = temp_dir_wav.path().join("playback.wav");
+
+    let wav_status = Command::new("ffmpeg")
         .arg("-i")
         .arg(&path)
         .arg("-ac")
         .arg("2")
         .arg("-y")
-        .arg(&output_path_str)
-        .spawn()
-        .map_err(|e| format!("ffmpeg command failed to spawn: {}", e))?
-        .wait()
-        .map_err(|e| format!("ffmpeg command failed to run: {}", e))?;
+        .arg(wav_output_path.to_str().unwrap())
+        .status()
+        .map_err(|e| format!("ffmpeg command for wav failed to run: {}", e))?;
 
-    if !status.success() {
-        return Err("ffmpeg command failed".to_string());
+    if !wav_status.success() {
+        return Err("ffmpeg command for wav failed".to_string());
     }
 
-    let wav_data = std::fs::read(&output_path)
+    let wav_data = std::fs::read(&wav_output_path)
         .map_err(|e| format!("Failed to read temporary wav file: {}", e))?;
-    
-    let playback_data_base64 = general_purpose::STANDARD.encode(&wav_data);
 
-    // The TempDir will be automatically dropped (and the file deleted) 
-    // when this function returns, which is what we want.
+    let playback_data_base64 = general_purpose::STANDARD.encode(&wav_data);
 
     Ok(ProcessedFile {
         metadata,
@@ -106,19 +210,19 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
-    .plugin(tauri_plugin_dialog::init())
-    .invoke_handler(tauri::generate_handler![process_audio_file])
-    .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
-      Ok(())
-    })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![process_audio_file])
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
