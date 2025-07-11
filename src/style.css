@@ -688,15 +688,15 @@ body.lyrics-active .progress-bar-container.simple {
     -webkit-mask-image: linear-gradient(
         to bottom,
         transparent 0%,
-        black 20%,  /* Adjust mask for new height */
-        black 80%,  /* Adjust mask for new height */
+        black 30%,
+        black 70%,
         transparent 100%
     );
     mask-image: linear-gradient(
         to bottom,
         transparent 0%,
-        black 20%,  /* Adjust mask for new height */
-        black 80%,  /* Adjust mask for new height */
+        black 30%,
+        black 70%,
         transparent 100%
     );
 }
@@ -811,11 +811,7 @@ body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .t
 }
 
 
-/* Define positions and styles for 5 lines - NOW WITH DYNAMIC TRANSFORMS */
-.lyrics-line[data-line-index="-2"] {
-    --scale: 0.55;
-    opacity: 0.2;
-}
+/* Define positions and styles for 3 lines - NOW WITH DYNAMIC TRANSFORMS */
 .lyrics-line[data-line-index="-1"] {
     --scale: 0.7;
     opacity: 0.5;
@@ -828,10 +824,6 @@ body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .t
 .lyrics-line[data-line-index="1"] {
     --scale: 0.7;
     opacity: 0.5;
-}
-.lyrics-line[data-line-index="2"] {
-    --scale: 0.55;
-    opacity: 0.2;
 }
 
 /* When the active line has no translation, center the original lyric */

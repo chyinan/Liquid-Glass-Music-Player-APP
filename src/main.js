@@ -475,7 +475,7 @@ function updateLyrics(currentTime) {
                  return;
             }
 
-            if (isActive && Math.abs(relativeIndex) <= 2) {
+            if (isActive && Math.abs(relativeIndex) <= 1) {
                 line.dataset.lineIndex = relativeIndex;
             } else {
                 delete line.dataset.lineIndex;
