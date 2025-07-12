@@ -11,6 +11,8 @@
     "default",
     "allow-read-all-files",
     "allow-temp-read-recursive",
+    "allow-get-system-fonts",
+    "allow-get-font-data",
     "core:event:default"
   ]
 }

@@ -2,6 +2,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { open } from '@tauri-apps/plugin-dialog';
+// NEW: 引入语言识别库
+import { franc } from 'franc';
 
 // DOM Elements
 const container = document.querySelector('.container');
@@ -29,6 +31,32 @@ const audioPlayer = document.getElementById('audioPlayer');
 const lyricsContainer = document.getElementById('lyrics-container');
 const lyricsLinesContainer = document.getElementById('lyrics-lines');
 const noLyricsMessage = document.getElementById('no-lyrics-message');
+// NEW: Settings Elements
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+// NEW: 更新为新的选择器ID
+const fontChineseSelect = document.getElementById('font-chinese-select');
+const fontJapaneseSelect = document.getElementById('font-japanese-select');
+const fontEnglishSelect = document.getElementById('font-english-select');
+const boldOriginalToggle = document.getElementById('bold-original-toggle');
+const boldTranslationToggle = document.getElementById('bold-translation-toggle');
+const opacityRange = document.getElementById('lyrics-opacity-range');
+
+/**
+ * Wrap ASCII/latin sequences with span.latin so他们使用英文字体
+ * @param {string} text raw text line
+ * @returns {string} html string with spans
+ */
+function wrapEnglish(text) {
+    // Simple escaping for < & >
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return text.split(/([A-Za-z0-9]+)/).map(seg => {
+        if (/^[A-Za-z0-9]+$/.test(seg)) {
+            return `<span class="latin">${esc(seg)}</span>`;
+        }
+        return esc(seg);
+    }).join('');
+}
 
 // 修复：确保加载动画在启动时是隐藏的
 loadingOverlay.classList.add('ui-hidden');
@@ -43,6 +71,214 @@ let currentLyricIndex = -1;
 // NEW: State for lyrics display mode
 // 0: off, 1: translation only, 2: bilingual (orig/trans), 3: bilingual-reversed (trans/orig), 4: original only
 let lyricsDisplayMode = 0;
+
+// === NEW: Settings and Font Management (Refactored) ===
+
+/**
+ * Injects a <style> tag with a @font-face rule for the given font data.
+ * @param {string} fontDataB64 - The base64 encoded font data.
+ * @param {string} fontFamilyName - The unique name to assign to this font-face.
+ */
+function injectFontFace(fontDataB64, fontFamilyName) {
+    // 移除旧的同名style标签，避免重复注入
+    const oldStyle = document.getElementById(`dynamic-font-style-${fontFamilyName}`);
+    if (oldStyle) {
+        oldStyle.remove();
+    }
+
+    const style = document.createElement('style');
+    style.id = `dynamic-font-style-${fontFamilyName}`;
+    style.textContent = `
+        @font-face {
+            font-family: '${fontFamilyName}';
+            src: url(data:font/truetype;base64,${fontDataB64});
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+/**
+ * Applies the selected fonts by fetching their data and injecting them.
+ */
+async function applyLyricsFonts() {
+    const fontSelectors = {
+        zh: fontChineseSelect,
+        ja: fontJapaneseSelect,
+        en: fontEnglishSelect,
+    };
+
+    for (const [lang, selectElement] of Object.entries(fontSelectors)) {
+        const selectedFont = selectElement.value;
+        const dynamicFontName = `dynamic-font-${lang}`;
+
+        if (selectedFont) {
+            try {
+                // 调用后端获取字体文件数据
+                const fontDataB64 = await invoke('get_font_data', { fontName: selectedFont });
+                // 动态注入 @font-face
+                injectFontFace(fontDataB64, dynamicFontName);
+                // 应用动态字体
+                document.documentElement.style.setProperty(`--font-${lang}`, `'${dynamicFontName}'`);
+            } catch (error) {
+                console.error(`Failed to load font ${selectedFont}:`, error);
+                // 加载失败则回退到无衬线字体
+                document.documentElement.style.setProperty(`--font-${lang}`, 'sans-serif');
+            }
+        } else {
+            // 如果选择“默认”，则回退
+            document.documentElement.style.setProperty(`--font-${lang}`, 'sans-serif');
+        }
+    }
+}
+
+/**
+ * Applies font weight based on bold toggle
+ * @param {boolean} isBold
+ */
+function applyLyricsBold(originalBold, translationBold) {
+    document.documentElement.style.setProperty('--lyrics-font-weight-original', originalBold ? '700' : '400');
+    document.documentElement.style.setProperty('--lyrics-font-weight-translation', translationBold ? '700' : '400');
+}
+
+/**
+ * Applies opacity based on the range value.
+ * @param {number} value - The value from the range input (0-100).
+ */
+function applyLyricsOpacity(value) {
+    const alpha = Math.max(0, Math.min(100, value)) / 100;
+    document.documentElement.style.setProperty('--lyrics-global-alpha', alpha.toString());
+}
+
+/**
+ * Fetches system fonts, populates the dropdowns, and applies the saved fonts.
+ */
+async function populateFontSelectors() {
+    try {
+        console.log('Attempting to fetch system fonts...');
+        const fonts = await invoke('get_system_fonts');
+        console.log('Received fonts from backend:', fonts);
+        if (!Array.isArray(fonts) || fonts.length === 0) return;
+
+        // 分组排序
+        // 基本汉字 & 日文假名检测
+        const chineseRegex = /[\u4e00-\u9fff]/;
+        const japaneseRegex = /[\u3040-\u30ff]/;
+        // 常见日文字体英文家族名关键字（Meiryo / MS Gothic / Yu Gothic / Noto Sans JP ...）
+        const japaneseKeywordRegex = /(Meiryo|Noto\s(?:Sans|Serif).*JP|Yu\s?Gothic|Yu\s?Mincho|MS\s(?:Gothic|Mincho|PMincho|PGothic|UI\sGothic)|Hiragino|IPA\s(?:Gothic|Mincho))/i;
+
+        const chineseFonts = [];
+        const japaneseFonts = [];
+        const otherFonts = [];
+
+        fonts.forEach(f => {
+            if (japaneseRegex.test(f) || japaneseKeywordRegex.test(f)) {
+                japaneseFonts.push(f);
+            } else if (chineseRegex.test(f)) {
+                chineseFonts.push(f);
+            } else {
+                otherFonts.push(f);
+            }
+        });
+
+        const groupedFonts = [
+            { label: '中文', list: chineseFonts.sort() },
+            { label: '日本語', list: japaneseFonts.sort() },
+            { label: '其他', list: otherFonts.sort() },
+        ];
+        
+        // NEW: 更新本地存储的键名
+        const savedChinese = localStorage.getItem('lyricsFontChinese') || '';
+        const savedJapanese = localStorage.getItem('lyricsFontJapanese') || '';
+        const savedEnglish = localStorage.getItem('lyricsFontEnglish') || '';
+        const savedBoldOriginal = localStorage.getItem('lyricsBoldOriginal') === '1';
+        const savedBoldTranslation = localStorage.getItem('lyricsBoldTranslation') === '1';
+        const savedOpacity = parseInt(localStorage.getItem('lyricsOpacity') || '100', 10);
+
+        const fillSelect = (selectEl, selectedValue) => {
+            selectEl.innerHTML = '<option value="">默认</option>';
+            groupedFonts.forEach(group => {
+                if (group.list.length === 0) return;
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = group.label;
+                group.list.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    if (name === selectedValue) option.selected = true;
+                    optgroup.appendChild(option);
+                });
+                selectEl.appendChild(optgroup);
+            });
+        };
+        
+        // NEW: 填充新的下拉框
+        fillSelect(fontChineseSelect, savedChinese);
+        fillSelect(fontJapaneseSelect, savedJapanese);
+        fillSelect(fontEnglishSelect, savedEnglish);
+
+        boldOriginalToggle.checked = savedBoldOriginal;
+        boldTranslationToggle.checked = savedBoldTranslation;
+        applyLyricsBold(savedBoldOriginal, savedBoldTranslation);
+
+        // 应用字体设置
+        await applyLyricsFonts();
+
+        // set range value and apply
+        opacityRange.value = savedOpacity;
+        applyLyricsOpacity(savedOpacity);
+
+    } catch (err) {
+        console.error('Failed to get system fonts:', err);
+    }
+}
+
+/**
+ * Sets up all event listeners and initial state for the settings panel.
+ */
+function setupSettings() {
+    // 切换面板显示
+    settingsBtn.addEventListener('click', () => {
+        settingsPanel.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+        if (!settingsPanel.contains(e.target) && !settingsBtn.contains(e.target)) {
+            settingsPanel.classList.add('hidden');
+        }
+    });
+
+    // 下拉变更事件
+    const onChange = async () => {
+        // NEW: 保存到新的本地存储键名
+        localStorage.setItem('lyricsFontChinese', fontChineseSelect.value);
+        localStorage.setItem('lyricsFontJapanese', fontJapaneseSelect.value);
+        localStorage.setItem('lyricsFontEnglish', fontEnglishSelect.value);
+        await applyLyricsFonts();
+    };
+    
+    // NEW: 监听新的下拉框
+    fontChineseSelect.addEventListener('change', onChange);
+    fontJapaneseSelect.addEventListener('change', onChange);
+    fontEnglishSelect.addEventListener('change', onChange);
+
+    // Bold toggle listeners
+    const onBoldChange = () => {
+        localStorage.setItem('lyricsBoldOriginal', boldOriginalToggle.checked ? '1' : '0');
+        localStorage.setItem('lyricsBoldTranslation', boldTranslationToggle.checked ? '1' : '0');
+        applyLyricsBold(boldOriginalToggle.checked, boldTranslationToggle.checked);
+    };
+    boldOriginalToggle.addEventListener('change', onBoldChange);
+    boldTranslationToggle.addEventListener('change', onBoldChange);
+
+    // Opacity range listener
+    opacityRange.addEventListener('input', () => {
+        const val = parseInt(opacityRange.value, 10);
+        localStorage.setItem('lyricsOpacity', val.toString());
+        applyLyricsOpacity(val);
+    });
+
+    populateFontSelectors();
+}
+
 
 // === 颜色工具函数和自适应主题 ===
     function rgbToHsl(r, g, b) {
@@ -595,28 +831,58 @@ function updateLyrics(currentTime) {
 // --- 新增函数 ---
 // 在加载时一次性渲染所有歌词行到 DOM 中
 function renderAllLyricsOnce() {
-    lyricsLinesContainer.innerHTML = ''; // 清空旧的
+    lyricsLinesContainer.innerHTML = ''; // 清空
+    if (!parsedLyrics || parsedLyrics.length === 0) {
+        noLyricsMessage.classList.remove('hidden');
+        return;
+    }
+    noLyricsMessage.classList.add('hidden');
+
     parsedLyrics.forEach((line, index) => {
         const li = document.createElement('li');
-        li.classList.add('lyrics-line');
-        li.dataset.absIndex = index; // 存储其在数组中的绝对索引
-
+        li.className = 'lyrics-line';
+        li.dataset.time = line.time;
+        // FIX: Add the absolute index back for the updateLyrics function to find the element.
+        li.dataset.absIndex = index;
+        
         const originalSpan = document.createElement('span');
-        originalSpan.classList.add('original-lyric');
-        originalSpan.textContent = line.text;
-
-        const translatedSpan = document.createElement('span');
-        translatedSpan.classList.add('translated-lyric');
-        // Only add translation if it exists
-        if (line.translation) {
-            translatedSpan.textContent = line.translation;
+        originalSpan.className = 'original-lyric';
+        
+        // FIX: Reverted to using `line.text` and added a fallback for empty lines.
+        let originalText = line.text || '';
+        let translationText = line.translation || null;
+        const metaRegex = /(作词|作曲|编曲)/;
+        if (!translationText && metaRegex.test(originalText)) {
+            // Treat meta lines as translation only
+            translationText = originalText;
+            originalText = '';
         }
-        // If no translation, the span will be empty, and the CSS ':empty' selector will hide it.
+        const langCode = franc(originalText, { minLength: 1 });
+        if (langCode === 'cmn' || langCode === 'nan') {
+            originalSpan.lang = 'zh-CN';
+        } else if (langCode === 'jpn') {
+            originalSpan.lang = 'ja';
+        } else {
+            originalSpan.lang = 'en';
+        }
 
+        originalSpan.innerHTML = wrapEnglish(originalText);
+ 
         li.appendChild(originalSpan);
-        li.appendChild(translatedSpan);
-
+        if (translationText) {
+            const translationSpan = document.createElement('span');
+            translationSpan.className = 'translated-lyric';
+            translationSpan.lang = 'zh-CN';
+            translationSpan.innerHTML = wrapEnglish(translationText);
+            li.appendChild(translationSpan);
+        }
         lyricsLinesContainer.appendChild(li);
     });
 }
+
+// === Initialization ===
+document.addEventListener('DOMContentLoaded', () => {
+    // All initial setup calls can go here.
+    setupSettings();
+});
 

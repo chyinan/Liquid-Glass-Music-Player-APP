@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,8 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <script type="module" crossorigin src="/assets/index-BDl1Xw3a.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-D-h9gJM7.css">
+  <script type="module" crossorigin src="/assets/index-CJs5O4df.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-9FomTOuc.css">
 </head>
 <body>
     <!-- SVG filter for liquid glass distortion effect -->
@@ -26,6 +26,45 @@
     <div class="container">
         
         <div class="file-select-container">
+            <div class="settings-icon-container" id="settingsBtn">
+                <i class="fas fa-cog"></i>
+            </div>
+
+            <div class="settings-panel hidden" id="settingsPanel">
+                <h3>Settings</h3>
+                <div class="setting-item">
+                    <label for="font-chinese-select">中文字体:</label>
+                    <select id="font-chinese-select">
+                        <option value="">默认</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="font-japanese-select">日文字体:</label>
+                    <select id="font-japanese-select">
+                        <option value="">默认</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="font-english-select">英文字体:</label>
+                    <select id="font-english-select">
+                        <option value="">默认</option>
+                    </select>
+                </div>
+                <!-- NEW: Separate bold toggles -->
+                <div class="setting-item">
+                    <label for="bold-original-toggle">原文加粗:</label>
+                    <input type="checkbox" id="bold-original-toggle">
+                </div>
+                <div class="setting-item">
+                    <label for="bold-translation-toggle">译文加粗:</label>
+                    <input type="checkbox" id="bold-translation-toggle">
+                </div>
+                <div class="setting-item">
+                    <label for="lyrics-opacity-range">歌词不透明度:</label>
+                    <input type="range" id="lyrics-opacity-range" min="0" max="100" value="100">
+                </div>
+            </div>
+
             <h1>Immersive Music Player</h1>
             <p>Enjoy your music with a beautiful liquid glass interface.</p>
             <button class="custom-file-upload" id="loadBtn">

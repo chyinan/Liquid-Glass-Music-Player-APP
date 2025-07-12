@@ -2,3 +2,11 @@
 identifier = "allow-process-audio-file"
 description = "Allows invoking the process_audio_file command"
 commands.allow = ["process_audio_file"] 
+[[permission]]
+identifier = "allow-get-system-fonts"
+description = "Allows invoking the get_system_fonts command"
+commands.allow = ["get_system_fonts"] 
+[[permission]]
+identifier = "allow-get-font-data"
+description = "Allows invoking the get_font_data command"
+commands.allow = ["get_font_data"] 

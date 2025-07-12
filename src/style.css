@@ -1,3 +1,11 @@
+/* --- Font Import: Smiley Sans --- */
+@font-face {
+    font-family: 'Smiley Sans';
+    /* 强制浏览器加载项目根目录下的字体文件，并修正相对路径 */
+    src: url('../SmileySans-Oblique.ttf.woff2') format('woff2');
+    font-display: swap; /* 优化加载体验，防止文字消失 */
+}
+
 /* 
 === GPU硬件加速优化说明 ===
 本CSS已针对GPU性能进行优化：
@@ -26,6 +34,15 @@
     --adaptive-text-color: #f0f0f0; /* 自适应文字颜色 */
     --adaptive-progress-bg: rgba(255, 255, 255, 0.2); /* 自适应进度条背景 */
     --adaptive-progress-fill: #ffffff; /* 自适应进度条填充颜色 */
+
+    /* 分离原文/译文字重 */
+    --lyrics-font-weight-original: 700;   /* 默认原文加粗 */
+    --lyrics-font-weight-translation: 400;/* 默认译文字重正常 */
+
+    /* NEW: Language-specific font variables */
+    --font-zh: 'Microsoft YaHei', sans-serif;
+    --font-ja: 'MS Mincho', sans-serif;
+    --font-en: 'Inter', sans-serif;
 }
 
 body {
@@ -39,11 +56,34 @@ body {
     min-height: 100vh;
     overflow: hidden;
 
+    /*
+     * 终极解决方案 B: 修正字体渲染模式
+     * 在Windows上，某些字符可能会触发Chromium渲染引擎的bug，导致其忽略font-feature-settings
+     * 并错误地回退到系统字体。通过将字体平滑模式从默认的“亚像素抗锯齿”
+     * 切换到“灰度抗锯齿”(antialiased)，可以强制浏览器使用不同的渲染路径，
+     * 这通常能绕过此类bug，确保所有字符都使用我们指定的字体和字形设置。
+     */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
     /* FINAL FIX: Force stable hardware acceleration context for the entire page to prevent flickering on complex animations */
     -webkit-transform: translate3d(0, 0, 0);
     transform: translate3d(0, 0, 0);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
+}
+
+/* 强制所有使用中文字体的地方启用简体中文字形特性 */
+.original-lyric, .translated-lyric {
+    /* 
+     * OpenType Feature 'locl': Localized Forms. 
+     * 强制为中文(CHN)或简体中文(ZHS)启用本地化字形。
+     * 这是解决简繁字体渲染错误的终极方案。
+     */
+    -moz-font-feature-settings: "locl" 1;
+    -ms-font-feature-settings: "locl" 1;
+    -webkit-font-feature-settings: "locl" 1;
+    font-feature-settings: "locl" 1;
 }
 
 /* --- Blurred Background --- */
@@ -114,6 +154,81 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
     padding: 2rem;
     background: rgba(10, 10, 10, 0.5);
     border-radius: 16px;
+    position: relative; /* Needed for absolute positioning of children */
+}
+
+.settings-icon-container {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: var(--secondary-text-color);
+    transition: color 0.3s, transform 0.3s;
+    z-index: 2; /* Ensure it's above the panel */
+}
+
+.settings-icon-container:hover {
+    color: var(--primary-text-color);
+    transform: rotate(45deg);
+}
+
+.settings-panel {
+    position: absolute;
+    top: 3.5rem; /* Position below the icon */
+    right: 1rem;
+    background: rgba(20, 20, 20, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 1;
+    text-align: left;
+    width: 250px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+}
+
+.settings-panel:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.settings-panel h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    color: var(--primary-text-color);
+}
+
+.settings-panel .setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.6rem; /* 新增：每项之间留足空间 */
+}
+
+/* 移除最后一项的额外间距 */
+.settings-panel .setting-item:last-child {
+    margin-bottom: 0;
+}
+
+.settings-panel label {
+    font-size: 0.9rem;
+    color: var(--secondary-text-color);
+}
+
+.settings-panel select {
+    background: #333;
+    color: var(--primary-text-color);
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 0.3rem 0.5rem;
+    width: 150px; /* Adjust as needed */
 }
 
 .file-select-container h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
@@ -607,15 +722,15 @@ body.drag-over #player-wrapper {
     align-items: flex-start;
     padding: 2rem 5vw 8rem; /* Add bottom padding to push lyrics up */
     z-index: 5; /* 置于播放器之上，确保可见 */
-    opacity: 0;
+    opacity: var(--lyrics-global-alpha, 1);
     transition: opacity 0.6s ease-in-out;
     pointer-events: none;
-    font-family: 'Inter', sans-serif;
+    /* 移除此处多余的字体设置，避免父容器字体干扰子元素 */
     transform: translateZ(0.0045px); /* GPU acceleration */
 }
 
 body.lyrics-active #lyrics-container {
-    opacity: 1;
+    opacity: var(--lyrics-global-alpha, 1);
     pointer-events: auto;
 }
 
@@ -704,7 +819,7 @@ body.lyrics-active .progress-bar-container.simple {
 /* 定义positions和styles，共5行。
    Transforms are now handled dynamically in JS for consistent spacing. */
 .lyrics-line {
-    font-weight: 600;
+    /* 字重交由子 span 控制 */
     line-height: 1.4; /* Adjusted for better multi-line spacing */
     position: absolute;
     width: 100%;
@@ -733,6 +848,7 @@ body.lyrics-active .progress-bar-container.simple {
 /* Style for the main, original lyric */
 .original-lyric {
     font-size: 4.0rem;
+    font-weight: var(--lyrics-font-weight-original, 700);
 }
 
 /* Style for the smaller, translated lyric */
@@ -740,11 +856,34 @@ body.lyrics-active .progress-bar-container.simple {
     font-size: 2.2rem; /* As requested, smaller but not too small */
     opacity: 0.8; /* Slightly less prominent */
     padding-left: 0.4rem; /* NEW: Slight indent to visually align with original */
+    font-weight: var(--lyrics-font-weight-translation, 400);
 }
+
+/* --- NEW: Language-based font-family rules --- */
+.original-lyric:lang(zh-CN),
+.translated-lyric:lang(zh-CN) {
+    font-family: var(--font-zh);
+}
+
+.original-lyric:lang(ja) {
+    font-family: var(--font-ja);
+}
+
+.original-lyric:lang(en) {
+    font-family: var(--font-en);
+}
+
 
 /* General rule: hide the translation span if it's empty to prevent unwanted spacing */
 .translated-lyric:empty {
     display: none;
+}
+
+/* NEW: Make single translation-only lines (e.g., meta lines) appear as main lyrics */
+.lyrics-line:has(.original-lyric:empty) .translated-lyric {
+    font-size: 4.0rem; /* Same size as primary lyrics */
+    opacity: 1;        /* Full opacity */
+    padding-left: 0;   /* Remove indent */
 }
 
 /* --- Visibility rules based on body class --- */
@@ -757,7 +896,6 @@ body.lyrics-mode-original .translated-lyric {
 body.lyrics-mode-original .lyrics-line {
     justify-content: center;
 }
-
 
 /* 2. Translation Only Mode */
 body.lyrics-mode-translation .original-lyric {
@@ -900,4 +1038,8 @@ body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .t
 }
 #player-ui-glass.minimal-mode:focus {
     outline: none !important;
+}
+
+.latin {
+    font-family: var(--lyrics-font-english), sans-serif;
 }

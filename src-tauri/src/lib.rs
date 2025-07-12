@@ -5,8 +5,68 @@ use std::collections::HashMap;
 use std::process::Command;
 use tempfile::tempdir;
 use encoding_rs::{GBK, UTF_16LE};
+use font_kit::source::SystemSource;
+use std::collections::HashSet;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+// use font_kit::family::Family; // no longer needed
+use font_kit::handle::Handle;
+use font_kit::properties::{Weight, Style};
+
+// The platform-specific `enumerate_localized_fonts` functions have been removed
+// in favor of the simpler, cross-platform `get_system_fonts` command below.
+
+#[tauri::command]
+fn get_system_fonts() -> Result<Vec<String>, String> {
+    let source = SystemSource::new();
+    let mut names: Vec<String> = source
+        .all_families()
+        .map_err(|e| format!("Failed to enumerate fonts: {e}"))?;
+
+    // Deduplicate & sort.
+    names.sort();
+    names.dedup();
+    Ok(names)
+}
+
+/// A command that takes a font family name and returns the font data as a Base64 string.
+#[tauri::command]
+fn get_font_data(font_name: String) -> Result<String, String> {
+    let source = SystemSource::new();
+    let family = source
+        .select_family_by_name(&font_name)
+        .map_err(|e| format!("Font family '{}' not found: {}", font_name, e))?;
+
+    // Pick the first font in the family that is Normal style & weight if possible.
+    let mut chosen_handle: Option<Handle> = None;
+
+    for handle in family.fonts() {
+        // Attempt to load to inspect properties. Ignore errors.
+        if let Ok(font) = handle.load() {
+            let props = font.properties();
+            if props.style == Style::Normal && props.weight == Weight::NORMAL {
+                chosen_handle = Some(handle.clone());
+                break;
+            }
+            // Fallback candidate
+            if chosen_handle.is_none() {
+                chosen_handle = Some(handle.clone());
+            }
+        }
+    }
+
+    let handle = chosen_handle.ok_or_else(|| format!("No fonts found in family '{}'.", font_name))?;
+
+    // Extract bytes from the handle.
+    let font_bytes = match handle {
+        Handle::Path { ref path, .. } => std::fs::read(path)
+            .map_err(|e| format!("Failed to read font file: {}", e))?,
+        Handle::Memory { bytes, .. } => bytes.to_vec(),
+    };
+
+    Ok(general_purpose::STANDARD.encode(&font_bytes))
+}
+
 
 #[derive(Deserialize, Debug)]
 struct FFProbeOutput {
@@ -263,7 +323,11 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![process_audio_file])
+        .invoke_handler(tauri::generate_handler![
+            process_audio_file,
+            get_system_fonts,
+            get_font_data
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
