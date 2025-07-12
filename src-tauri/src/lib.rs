@@ -6,7 +6,6 @@ use std::process::Command;
 use tempfile::tempdir;
 use encoding_rs::{GBK, UTF_16LE};
 use font_kit::source::SystemSource;
-use std::collections::HashSet;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 // use font_kit::family::Family; // no longer needed
