@@ -231,6 +231,125 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
     width: 150px; /* Adjust as needed */
 }
 
+/* === NEW: Glassmorphism Inputs === */
+
+/* --- Custom Checkbox --- */
+.settings-panel input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin: 0;
+    font: inherit;
+    color: currentColor;
+    width: 1.25em;
+    height: 1.25em;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.35em; /* Softer corners */
+    transform: translateY(-0.075em);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.05);
+}
+
+.settings-panel input[type="checkbox"]::before {
+    content: "";
+    width: 0.7em;
+    height: 0.7em;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    background-color: var(--accent-color);
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    box-shadow: 0 0 8px var(--accent-color);
+}
+
+.settings-panel input[type="checkbox"]:checked {
+    background-color: rgba(127, 178, 255, 0.25); /* A bit of color when active */
+    border-color: rgba(127, 178, 255, 0.5);
+}
+
+.settings-panel input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+.settings-panel input[type="checkbox"]:hover {
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* --- Custom Range Slider --- */
+.settings-panel input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 150px;
+    height: 20px; /* Taller to make it easier to click */
+    background: transparent;
+    cursor: pointer;
+    outline: none;
+}
+
+.settings-panel input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    /* The magic is here: using a gradient that is controlled by a CSS variable */
+    background: linear-gradient(to right, 
+        rgba(255, 255, 255, 0.8) var(--range-progress, 100%), 
+        rgba(0, 0, 0, 0.4) var(--range-progress, 100%)
+    );
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-panel input[type="range"]::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Firefox progress fill */
+.settings-panel input[type="range"]::-moz-range-progress {
+    background-color: rgba(255, 255, 255, 0.8);
+    height: 6px;
+    border-radius: 3px;
+}
+
+.settings-panel input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    margin-top: -7px; 
+    width: 20px;
+    height: 20px;
+    background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(220,220,255,0.9) 100%);
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 2px rgba(0,0,0,0.5), 0 0 10px rgba(255, 255, 255, 0.7);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.settings-panel input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(220,220,255,0.9) 100%);
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 2px rgba(0,0,0,0.5), 0 0 10px rgba(255, 255, 255, 0.7);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.settings-panel input[type="range"]:hover::-webkit-slider-thumb,
+.settings-panel input[type="range"]:focus::-webkit-slider-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 0 2px rgba(0,0,0,0.5), 0 0 15px rgba(255, 255, 255, 1);
+}
+
+.settings-panel input[type="range"]:hover::-moz-range-thumb,
+.settings-panel input[type="range"]:focus::-moz-range-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 0 2px rgba(0,0,0,0.5), 0 0 15px rgba(255, 255, 255, 1);
+}
+
 .file-select-container h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
 .file-select-container p { color: var(--secondary-text-color); font-size: 1.1rem; margin-bottom: 2rem; }
 input[type="file"] { display: none; }
@@ -1025,6 +1144,54 @@ body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .t
     opacity: 0 !important;
     pointer-events: none !important;
 }
+
+/* --- NEW: Lyrics Mode Indicator --- */
+#lyrics-mode-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    z-index: 200; /* Ensure it's on top of everything */
+    background: rgba(30, 30, 30, 0.5);
+    backdrop-filter: blur(15px) saturate(1.5);
+    -webkit-backdrop-filter: blur(15px) saturate(1.5);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    color: white;
+    padding: 2.5rem 3rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1), transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+#lyrics-mode-indicator.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+}
+
+.indicator-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    text-align: center;
+}
+
+.indicator-icon {
+    font-size: 6rem;
+    line-height: 1;
+    font-family: 'Smiley Sans', sans-serif; /* Use a special font for icons if needed */
+}
+
+.indicator-text {
+    font-size: 1.2rem;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
 
 #player-wrapper.minimal-active,
 #player-wrapper:has(#player-ui-glass.minimal-mode),

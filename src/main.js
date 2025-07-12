@@ -185,7 +185,7 @@ async function populateFontSelectors() {
             { label: '日本語', list: japaneseFonts.sort() },
             { label: '其他', list: otherFonts.sort() },
         ];
-        
+
         // NEW: 更新本地存储的键名
         const savedChinese = localStorage.getItem('lyricsFontChinese') || '';
         const savedJapanese = localStorage.getItem('lyricsFontJapanese') || '';
@@ -210,7 +210,7 @@ async function populateFontSelectors() {
                 selectEl.appendChild(optgroup);
             });
         };
-        
+
         // NEW: 填充新的下拉框
         fillSelect(fontChineseSelect, savedChinese);
         fillSelect(fontJapaneseSelect, savedJapanese);
@@ -254,7 +254,7 @@ function setupSettings() {
         localStorage.setItem('lyricsFontEnglish', fontEnglishSelect.value);
         await applyLyricsFonts();
     };
-    
+
     // NEW: 监听新的下拉框
     fontChineseSelect.addEventListener('change', onChange);
     fontJapaneseSelect.addEventListener('change', onChange);
@@ -844,7 +844,7 @@ function renderAllLyricsOnce() {
         li.dataset.time = line.time;
         // FIX: Add the absolute index back for the updateLyrics function to find the element.
         li.dataset.absIndex = index;
-        
+
         const originalSpan = document.createElement('span');
         originalSpan.className = 'original-lyric';
         
@@ -867,7 +867,7 @@ function renderAllLyricsOnce() {
         }
 
         originalSpan.innerHTML = wrapEnglish(originalText);
- 
+
         li.appendChild(originalSpan);
         if (translationText) {
             const translationSpan = document.createElement('span');
@@ -880,9 +880,87 @@ function renderAllLyricsOnce() {
     });
 }
 
+// --- NEW: Lyrics Mode Indicator ---
+const lyricsModeIndicator = document.getElementById('lyrics-mode-indicator');
+const indicatorIcon = lyricsModeIndicator.querySelector('.indicator-icon');
+const indicatorText = lyricsModeIndicator.querySelector('.indicator-text');
+let indicatorTimeout;
+
+function showLyricsModeIndicator(mode) {
+    clearTimeout(indicatorTimeout);
+
+    const modeMap = {
+        'original': { icon: 'Aあ', text: '原文模式' },
+        'translation': { icon: '译', text: '译文模式' },
+        'bilingual': { icon: 'Aあ<br>译', text: '双语模式' },
+        'bilingual-reversed': { icon: '译<br>Aあ', text: '双语模式 (反转)' }
+    };
+
+    const config = modeMap[mode] || { icon: '?', text: '未知模式' };
+    
+    indicatorIcon.innerHTML = config.icon;
+    indicatorText.textContent = config.text;
+
+    lyricsModeIndicator.classList.add('visible');
+
+    indicatorTimeout = setTimeout(() => {
+        lyricsModeIndicator.classList.remove('visible');
+    }, 1500); // Keep it visible for 1.5 seconds
+}
+
+
+function setupLyrics(parsedLrc) {
+    if (!parsedLrc || !parsedLrc.lines || parsedLrc.lines.length === 0) {
+        lyricsContainer.classList.add('hidden');
+        document.body.classList.remove('lyrics-active');
+        document.body.classList.remove('lyrics-mode-original', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed');
+        localStorage.removeItem('lyricsMode'); // Clear saved mode if no lyrics
+        return;
+    }
+    lyricsContainer.classList.remove('hidden');
+    document.body.classList.add('lyrics-active');
+    
+    // --- Apply saved lyrics mode ---
+    const savedLyricsMode = localStorage.getItem('lyricsMode') || 'bilingual';
+    setLyricsDisplayMode(savedLyricsMode);
+    showLyricsModeIndicator(savedLyricsMode); // Show indicator on initial load
+
+    // The keyboard listener is now handled globally, so it's removed from here.
+}
+
+function handleLyricsModeSwitch(event) {
+    // NEW: Only run the switcher if lyrics are currently active.
+    if (!document.body.classList.contains('lyrics-active')) {
+        return;
+    }
+
+    // Cycle through modes: bilingual -> original -> translation -> bilingual-reversed
+    if (event.key === 'l' || event.key === 'L') {
+        const modes = ['bilingual', 'bilingual-reversed', 'original', 'translation'];
+        const currentMode = document.body.className.match(/lyrics-mode-(\S+)/)?.[1] || 'bilingual';
+        const currentIndex = modes.indexOf(currentMode);
+        const nextIndex = (currentIndex + 1) % modes.length;
+        const nextMode = modes[nextIndex];
+        setLyricsDisplayMode(nextMode);
+        showLyricsModeIndicator(nextMode); // <-- SHOW INDICATOR ON SWITCH
+    }
+}
+
+function setLyricsDisplayMode(mode) {
+    // Remove all mode classes
+    document.body.classList.remove('lyrics-mode-original', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed');
+    // Add the new mode class
+    document.body.classList.add(`lyrics-mode-${mode}`);
+    // Save the new mode
+    localStorage.setItem('lyricsMode', mode);
+}
+
 // === Initialization ===
 document.addEventListener('DOMContentLoaded', () => {
     // All initial setup calls can go here.
     setupSettings();
 });
+
+// NEW: Add a single, global event listener for lyrics mode switching.
+window.addEventListener('keydown', handleLyricsModeSwitch);
 
