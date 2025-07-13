@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose, Engine as _};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::process::Command;
@@ -10,22 +10,123 @@ use font_kit::source::SystemSource;
 use std::os::windows::process::CommandExt;
 // use font_kit::family::Family; // no longer needed
 use font_kit::handle::Handle;
-use font_kit::properties::{Weight, Style};
+use font_kit::properties::{Style, Weight};
 
-// The platform-specific `enumerate_localized_fonts` functions have been removed
-// in favor of the simpler, cross-platform `get_system_fonts` command below.
+#[derive(Serialize)]
+struct FontData {
+    name: String,
+    italic: bool,
+    weight: u16,
+    data: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CategorizedFonts {
+    zh_fonts: Vec<String>,
+    ja_fonts: Vec<String>,
+    en_fonts: Vec<String>,
+    other_fonts: Vec<String>,
+}
+
+// Helper function to check for language support in a font
+fn check_lang_support(font: &font_kit::font::Font, lang_code: &str) -> bool {
+    match lang_code {
+        // Simplified Chinese: Check for common characters "你" and "好"
+        "zh-Hans" => {
+            font.glyph_for_char('你').is_some() && font.glyph_for_char('好').is_some()
+        }
+        // Japanese: Check for Hiragana "あ" and Katakana "カ"
+        "ja" => {
+            font.glyph_for_char('あ').is_some() && font.glyph_for_char('カ').is_some()
+        }
+        _ => false,
+    }
+}
 
 #[tauri::command]
-fn get_system_fonts() -> Result<Vec<String>, String> {
+fn get_system_fonts() -> Result<CategorizedFonts, String> {
     let source = SystemSource::new();
-    let mut names: Vec<String> = source
-        .all_families()
-        .map_err(|e| format!("Failed to enumerate fonts: {e}"))?;
+    let mut font_names: HashMap<String, (bool, bool)> = HashMap::new(); // (is_zh, is_ja)
 
-    // Deduplicate & sort.
-    names.sort();
-    names.dedup();
-    Ok(names)
+    // First pass: Iterate through all fonts to determine their likely language support
+    if let Ok(handles) = source.all_fonts() {
+        for handle in handles.iter() {
+            if let Ok(font) = handle.load() {
+                let family_name = font.family_name();
+                let entry = font_names.entry(family_name).or_insert((false, false));
+                if !entry.0 && check_lang_support(&font, "zh-Hans") {
+                    entry.0 = true;
+                }
+                if !entry.1 && check_lang_support(&font, "ja") {
+                    entry.1 = true;
+                }
+            }
+        }
+    } else {
+        return Err("Failed to query system fonts.".into());
+    }
+
+    // Second pass: Categorize based on the collected information
+    let mut zh_fonts = Vec::new();
+    let mut ja_fonts = Vec::new();
+    let mut en_fonts = Vec::new();
+    let mut other_fonts = Vec::new();
+
+    // Helper closures for name pattern checks
+    let looks_chinese = |fname: &str| {
+        let patterns = [
+            "sc", "cn", "gb", "hei", "song", "kai", "fang", "ping", "sim", "msyh", "思源", "方正", "兰亭", "微软雅黑", "华文", "中易", "简" , "宋" , "黑" , "楷" , "体" , "粗" , "细"
+        ];
+        let lname = fname.to_lowercase();
+        patterns.iter().any(|p| lname.contains(p))
+    };
+
+    let looks_japanese = |fname: &str| {
+        let patterns = [
+            "jp", "mincho", "gothic", "hiragino", "meiryo", "yu", "kozuka", "ipa", "hg", "ms pgothic", "ms gothic", "明朝", "ゴシック", "メイリオ","uzura"
+        ];
+        let lname = fname.to_lowercase();
+        patterns.iter().any(|p| lname.contains(p)) || fname.contains('ゴ') || fname.contains('リ')
+    };
+
+    for (name, (is_zh, is_ja)) in font_names {
+        match (is_zh, is_ja) {
+            (true, false) => zh_fonts.push(name),
+            (false, true) => ja_fonts.push(name),
+            (true, true) => {
+                // Both languages detected, decide by heuristics on name
+                if looks_chinese(&name) && !looks_japanese(&name) {
+                    zh_fonts.push(name);
+                } else if looks_japanese(&name) && !looks_chinese(&name) {
+                    ja_fonts.push(name);
+                } else {
+                    // fallback: prefer Chinese to reduce loss
+                    zh_fonts.push(name);
+                }
+            }
+            (false, false) => {
+                if name.chars().all(|c| c.is_ascii()) {
+                    en_fonts.push(name);
+                } else {
+                    other_fonts.push(name);
+                }
+            }
+        }
+    }
+    
+    // Sort the lists alphabetically
+    zh_fonts.sort();
+    ja_fonts.sort();
+    en_fonts.sort();
+    other_fonts.sort();
+
+    Ok(CategorizedFonts {
+        zh_fonts,
+        ja_fonts,
+        en_fonts,
+        other_fonts,
+    })
 }
 
 /// A command that takes a font family name and returns the font data as a Base64 string.
@@ -316,6 +417,12 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
         album_art_base64,
         lyrics,
     })
+}
+
+#[derive(Deserialize)]
+struct GetFontDataPayload {
+    #[serde(rename = "fontName")]
+    font_name: String,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

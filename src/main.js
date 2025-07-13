@@ -149,88 +149,92 @@ function applyLyricsOpacity(value) {
     document.documentElement.style.setProperty('--lyrics-global-alpha', alpha.toString());
 }
 
-/**
- * Fetches system fonts, populates the dropdowns, and applies the saved fonts.
- */
-async function populateFontSelectors() {
-    try {
-        console.log('Attempting to fetch system fonts...');
-        const fonts = await invoke('get_system_fonts');
-        console.log('Received fonts from backend:', fonts);
-        if (!Array.isArray(fonts) || fonts.length === 0) return;
+function populateFontSelectors(categorizedFonts) {
+    const { zhFonts, jaFonts, enFonts, otherFonts } = categorizedFonts;
 
-        // 分组排序
-        // 基本汉字 & 日文假名检测
-        const chineseRegex = /[\u4e00-\u9fff]/;
-        const japaneseRegex = /[\u3040-\u30ff]/;
-        // 常见日文字体英文家族名关键字（Meiryo / MS Gothic / Yu Gothic / Noto Sans JP ...）
-        const japaneseKeywordRegex = /(Meiryo|Noto\s(?:Sans|Serif).*JP|Yu\s?Gothic|Yu\s?Mincho|MS\s(?:Gothic|Mincho|PMincho|PGothic|UI\sGothic)|Hiragino|IPA\s(?:Gothic|Mincho))/i;
+    const groups = [
+        { label: '中文', list: zhFonts },
+        { label: '日文', list: jaFonts },
+        { label: '英文字体', list: enFonts },
+        { label: '其他', list: otherFonts },
+    ];
 
-        const chineseFonts = [];
-        const japaneseFonts = [];
-        const otherFonts = [];
-
-        fonts.forEach(f => {
-            if (japaneseRegex.test(f) || japaneseKeywordRegex.test(f)) {
-                japaneseFonts.push(f);
-            } else if (chineseRegex.test(f)) {
-                chineseFonts.push(f);
-            } else {
-                otherFonts.push(f);
-            }
-        });
-
-        const groupedFonts = [
-            { label: '中文', list: chineseFonts.sort() },
-            { label: '日本語', list: japaneseFonts.sort() },
-            { label: '其他', list: otherFonts.sort() },
-        ];
-
-        // NEW: 更新本地存储的键名
-        const savedChinese = localStorage.getItem('lyricsFontChinese') || '';
-        const savedJapanese = localStorage.getItem('lyricsFontJapanese') || '';
-        const savedEnglish = localStorage.getItem('lyricsFontEnglish') || '';
-        const savedBoldOriginal = localStorage.getItem('lyricsBoldOriginal') === '1';
-        const savedBoldTranslation = localStorage.getItem('lyricsBoldTranslation') === '1';
-        const savedOpacity = parseInt(localStorage.getItem('lyricsOpacity') || '100', 10);
-
-        const fillSelect = (selectEl, selectedValue) => {
-            selectEl.innerHTML = '<option value="">默认</option>';
-            groupedFonts.forEach(group => {
-                if (group.list.length === 0) return;
-                const optgroup = document.createElement('optgroup');
-                optgroup.label = group.label;
-                group.list.forEach(name => {
-                    const option = document.createElement('option');
-                    option.value = name;
-                    option.textContent = name;
-                    if (name === selectedValue) option.selected = true;
-                    optgroup.appendChild(option);
-                });
-                selectEl.appendChild(optgroup);
+    const populateWithGroups = (select) => {
+        select.innerHTML = '<option value="">默认</option>';
+        groups.forEach(group => {
+            if (!group.list || group.list.length === 0) return;
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = group.label;
+            group.list.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                optgroup.appendChild(option);
             });
-        };
+            select.appendChild(optgroup);
+        });
+    };
 
-        // NEW: 填充新的下拉框
-        fillSelect(fontChineseSelect, savedChinese);
-        fillSelect(fontJapaneseSelect, savedJapanese);
-        fillSelect(fontEnglishSelect, savedEnglish);
+    populateWithGroups(fontChineseSelect);
+    populateWithGroups(fontJapaneseSelect);
+    populateWithGroups(fontEnglishSelect);
+}
 
-        boldOriginalToggle.checked = savedBoldOriginal;
-        boldTranslationToggle.checked = savedBoldTranslation;
-        applyLyricsBold(savedBoldOriginal, savedBoldTranslation);
+async function loadAndPopulateFonts() {
+    try {
+        const categorizedFonts = await invoke('get_system_fonts');
+        populateFontSelectors(categorizedFonts);
+        
+        // Restore saved font preferences after populating
+        const savedZhFont = localStorage.getItem('font-zh');
+        const savedJaFont = localStorage.getItem('font-ja');
+        const savedEnFont = localStorage.getItem('font-en');
 
-        // 应用字体设置
-        await applyLyricsFonts();
+        if (savedZhFont) {
+            fontChineseSelect.value = savedZhFont;
+            updateFontVariable('--font-zh', savedZhFont);
+        }
+        if (savedJaFont) {
+            fontJapaneseSelect.value = savedJaFont;
+            updateFontVariable('--font-ja', savedJaFont);
+        }
+        if (savedEnFont) {
+            fontEnglishSelect.value = savedEnFont;
+            updateFontVariable('--font-en', savedEnFont);
+        }
 
-        // set range value and apply
-        opacityRange.value = savedOpacity;
-        applyLyricsOpacity(savedOpacity);
-
-    } catch (err) {
-        console.error('Failed to get system fonts:', err);
+    } catch (error) {
+        console.error("Failed to load system fonts:", error);
     }
 }
+
+function updateFontVariable(variable, fontName) {
+    if (fontName) {
+        document.documentElement.style.setProperty(variable, `'${fontName}', sans-serif`);
+    } else {
+        // Revert to default
+        document.documentElement.style.removeProperty(variable);
+    }
+}
+
+// Event Listeners for font selection
+fontChineseSelect.addEventListener('change', (e) => {
+    const fontName = e.target.value;
+    localStorage.setItem('font-zh', fontName);
+    updateFontVariable('--font-zh', fontName);
+});
+
+fontJapaneseSelect.addEventListener('change', (e) => {
+    const fontName = e.target.value;
+    localStorage.setItem('font-ja', fontName);
+    updateFontVariable('--font-ja', fontName);
+});
+
+fontEnglishSelect.addEventListener('change', (e) => {
+    const fontName = e.target.value;
+    localStorage.setItem('font-en', fontName);
+    updateFontVariable('--font-en', fontName);
+});
 
 /**
  * Sets up all event listeners and initial state for the settings panel.
@@ -276,7 +280,7 @@ function setupSettings() {
         applyLyricsOpacity(val);
     });
 
-    populateFontSelectors();
+    loadAndPopulateFonts();
 }
 
 
@@ -655,9 +659,9 @@ function toggleLyrics() {
         settings.classList.toggle('visually-hidden', lyricsActive);
     }
     
-    // 修复：切换时立即更新歌词
+    // 修复：切换时立即更新歌词，但延迟到下一帧，确保新CSS生效后再计算位置
     currentLyricIndex = -1;
-    updateLyrics(audioPlayer.currentTime);
+    requestAnimationFrame(() => updateLyrics(audioPlayer.currentTime, true));
 }
 
 // All marquee-related JavaScript has been removed for simplicity.
@@ -699,7 +703,7 @@ function parseLRC(lrcText) {
     return finalLyrics;
 }
 
-function updateLyrics(currentTime) {
+function updateLyrics(currentTime, forceRecalc = false) {
     if (parsedLyrics.length === 0) {
         return;
     }
@@ -719,7 +723,7 @@ function updateLyrics(currentTime) {
 
     // The condition should ONLY update the index.
     // The DOM update logic must run every time to handle mode switches.
-    if (newLyricIndex !== currentLyricIndex) {
+    if (forceRecalc || newLyricIndex !== currentLyricIndex) {
         currentLyricIndex = newLyricIndex;
 
         // --- CORE LOGIC MOVED ---
@@ -851,11 +855,10 @@ function renderAllLyricsOnce() {
         // FIX: Reverted to using `line.text` and added a fallback for empty lines.
         let originalText = line.text || '';
         let translationText = line.translation || null;
-        const metaRegex = /(作词|作曲|编曲)/;
+        const metaRegex = /(作[词詞]|作曲|编曲|編曲|詞|曲|lyrics?)/i;
         if (!translationText && metaRegex.test(originalText)) {
-            // Treat meta lines as translation only
-            translationText = originalText;
-            originalText = '';
+            // Treat meta lines as original-only so they keep normal size in all modes
+            translationText = null;
         }
         const langCode = franc(originalText, { minLength: 1 });
         if (langCode === 'cmn' || langCode === 'nan') {
@@ -869,13 +872,15 @@ function renderAllLyricsOnce() {
         originalSpan.innerHTML = wrapEnglish(originalText);
 
         li.appendChild(originalSpan);
+        const translationSpan = document.createElement('span');
+        translationSpan.className = 'translated-lyric';
+        translationSpan.lang = 'zh-CN';
         if (translationText) {
-            const translationSpan = document.createElement('span');
-            translationSpan.className = 'translated-lyric';
-            translationSpan.lang = 'zh-CN';
             translationSpan.innerHTML = wrapEnglish(translationText);
-            li.appendChild(translationSpan);
+        } else {
+            translationSpan.innerHTML = '';
         }
+        li.appendChild(translationSpan);
         lyricsLinesContainer.appendChild(li);
     });
 }
