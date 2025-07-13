@@ -168,7 +168,12 @@ function populateFontSelectors(categorizedFonts) {
             group.list.forEach(name => {
                 const option = document.createElement('option');
                 option.value = name;
-                option.textContent = name;
+                // Use localized display name when available
+                option.textContent = getLocalizedFontName(name);
+                // NEW: Render each option using its own font family for live preview
+                option.style.fontFamily = `'${name}', sans-serif`;
+                // Optional: Slightly larger font size for better visibility
+                option.style.fontSize = '16px';
                 optgroup.appendChild(option);
             });
             select.appendChild(optgroup);
@@ -614,7 +619,11 @@ function hideLoading() {
 }
 
 function toggleLyrics() {
-    const hasTranslation = parsedLyrics.some(l => l.translation);
+    // NEW: Define regex here to check for metadata lines like '作词', '作曲', '译' etc.
+    const metaRegex = /(作[词詞]|作曲|编曲|編曲|詞|曲|译|arranger|composer|lyricist|lyrics|ti|ar|al|by)/i;
+    // UPDATED: A song is considered to have translations only if there's at least one
+    // translated line that isn't just metadata.
+    const hasTranslation = parsedLyrics.some(l => l.translation && !metaRegex.test(l.text));
 
     // If there's no translation, just toggle between off (0) and original (4).
     if (!hasTranslation) {
@@ -624,11 +633,19 @@ function toggleLyrics() {
             lyricsDisplayMode = 0; // From original, go to off
         }
     } else {
-        // If there IS a translation, cycle through all five modes.
-        lyricsDisplayMode = (lyricsDisplayMode + 1) % 5;
+        // Corrected Cycle: Off(0) -> Bilingual(2) -> Reversed(3) -> Original(4) -> Translation(1) -> Off(0)
+        const nextModeMap = {
+            0: 2, // Off -> Bilingual
+            2: 3, // Bilingual -> Bilingual Reversed
+            3: 4, // Bilingual Reversed -> Original
+            4: 1, // Original -> Translation
+            1: 0  // Translation -> Off
+        };
+        lyricsDisplayMode = nextModeMap[lyricsDisplayMode] ?? 0; // Default to Off if state is weird
     }
 
     const lyricsActive = lyricsDisplayMode !== 0;
+    let modeString = ''; // String name for the current mode for the indicator
 
     // This is the missing line that controls the visibility of the entire lyrics panel.
     lyricsContainer.classList.toggle('hidden', !lyricsActive);
@@ -640,18 +657,24 @@ function toggleLyrics() {
         document.body.classList.add('lyrics-active');
         switch (lyricsDisplayMode) {
             case 1: // Translation only
+                modeString = 'translation';
                 document.body.classList.add('lyrics-mode-translation');
                 break;
             case 2: // Bilingual (orig/trans)
+                modeString = 'bilingual';
                 document.body.classList.add('lyrics-mode-bilingual');
                 break;
             case 3: // Bilingual (trans/orig)
+                modeString = 'bilingual-reversed';
                 document.body.classList.add('lyrics-mode-bilingual-reversed');
                 break;
             case 4: // Original only
+                modeString = 'original';
                 document.body.classList.add('lyrics-mode-original');
                 break;
         }
+        // Now that we have the correct mode string, show the indicator.
+        showLyricsModeIndicator(modeString);
     }
     
     const settings = document.querySelector('.settings-wrapper');
@@ -854,12 +877,9 @@ function renderAllLyricsOnce() {
         
         // FIX: Reverted to using `line.text` and added a fallback for empty lines.
         let originalText = line.text || '';
-        let translationText = line.translation || null;
-        const metaRegex = /(作[词詞]|作曲|编曲|編曲|詞|曲|lyrics?)/i;
-        if (!translationText && metaRegex.test(originalText)) {
-            // Treat meta lines as original-only so they keep normal size in all modes
-            translationText = null;
-        }
+        // REMOVED: The confusing and ineffective meta-regex check block is gone.
+        // The logic for determining "hasTranslation" is now correctly handled in toggleLyrics.
+        
         const langCode = franc(originalText, { minLength: 1 });
         if (langCode === 'cmn' || langCode === 'nan') {
             originalSpan.lang = 'zh-CN';
@@ -875,8 +895,8 @@ function renderAllLyricsOnce() {
         const translationSpan = document.createElement('span');
         translationSpan.className = 'translated-lyric';
         translationSpan.lang = 'zh-CN';
-        if (translationText) {
-            translationSpan.innerHTML = wrapEnglish(translationText);
+        if (line.translation) {
+            translationSpan.innerHTML = wrapEnglish(line.translation);
         } else {
             translationSpan.innerHTML = '';
         }
@@ -913,59 +933,114 @@ function showLyricsModeIndicator(mode) {
     }, 1500); // Keep it visible for 1.5 seconds
 }
 
-
-function setupLyrics(parsedLrc) {
-    if (!parsedLrc || !parsedLrc.lines || parsedLrc.lines.length === 0) {
-        lyricsContainer.classList.add('hidden');
-        document.body.classList.remove('lyrics-active');
-        document.body.classList.remove('lyrics-mode-original', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed');
-        localStorage.removeItem('lyricsMode'); // Clear saved mode if no lyrics
-        return;
-    }
-    lyricsContainer.classList.remove('hidden');
-    document.body.classList.add('lyrics-active');
-    
-    // --- Apply saved lyrics mode ---
-    const savedLyricsMode = localStorage.getItem('lyricsMode') || 'bilingual';
-    setLyricsDisplayMode(savedLyricsMode);
-    showLyricsModeIndicator(savedLyricsMode); // Show indicator on initial load
-
-    // The keyboard listener is now handled globally, so it's removed from here.
-}
-
-function handleLyricsModeSwitch(event) {
-    // NEW: Only run the switcher if lyrics are currently active.
-    if (!document.body.classList.contains('lyrics-active')) {
-        return;
-    }
-
-    // Cycle through modes: bilingual -> original -> translation -> bilingual-reversed
-    if (event.key === 'l' || event.key === 'L') {
-        const modes = ['bilingual', 'bilingual-reversed', 'original', 'translation'];
-        const currentMode = document.body.className.match(/lyrics-mode-(\S+)/)?.[1] || 'bilingual';
-        const currentIndex = modes.indexOf(currentMode);
-        const nextIndex = (currentIndex + 1) % modes.length;
-        const nextMode = modes[nextIndex];
-        setLyricsDisplayMode(nextMode);
-        showLyricsModeIndicator(nextMode); // <-- SHOW INDICATOR ON SWITCH
-    }
-}
-
-function setLyricsDisplayMode(mode) {
-    // Remove all mode classes
-    document.body.classList.remove('lyrics-mode-original', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed');
-    // Add the new mode class
-    document.body.classList.add(`lyrics-mode-${mode}`);
-    // Save the new mode
-    localStorage.setItem('lyricsMode', mode);
-}
-
 // === Initialization ===
 document.addEventListener('DOMContentLoaded', () => {
     // All initial setup calls can go here.
     setupSettings();
 });
 
-// NEW: Add a single, global event listener for lyrics mode switching.
-window.addEventListener('keydown', handleLyricsModeSwitch);
+// === NEW: Localized Font Name Mapping ===
+// Map English family names to their localized (Japanese/Chinese) display names for better readability in the dropdowns.
+const LOCALIZED_FONT_NAME_MAP = {
+    // Japanese fonts
+    "Yu Mincho": "游明朝",
+    "YuMincho": "游明朝",
+    "Yu Mincho UI": "游明朝 UI",
+    "YuMincho UI": "游明朝 UI",
+    "Yu Gothic": "游ゴシック",
+    "YuGothic": "游ゴシック",
+    "Yu Gothic UI": "游ゴシック UI",
+    "YuGothic UI": "游ゴシック UI",
+    "MS Mincho": "ＭＳ 明朝",
+    "MS Gothic": "ＭＳ ゴシック",
+    "MS PGothic": "ＭＳ Ｐゴシック",
+    "Meiryo": "メイリオ",
+    "SoukouMincho": "装甲明朝",
+    "Rounded M+ 1p": "Rounded M+ 1p",
+    // Chinese common aliases (optional)
+    "Noto Sans SC": "思源黑体 SC",
+    "Noto Serif SC": "思源宋体 SC",
+    "Source Han Sans SC": "思源黑体 SC",
+    "Source Han Serif SC": "思源宋体 SC",
+    // Add more mappings as needed...
+    "Sarasa Fixed J": "更纱等距 J",
+    "Sarasa Fixed SC": "更纱等距 SC",
+    "Sarasa Fixed Slab J": "更纱等距 Slab J",
+    "Sarasa Fixed Slab SC": "更纱等距 Slab SC",
+    "Sarasa Term SC": "更纱等宽 SC",
+    "Sarasa Term J": "更纱等宽 J",
+    "Sarasa Term Slab J": "更纱等宽 Slab J",
+    "Sarasa Term Slab SC": "更纱等宽 Slab SC",
+    "Sarasa Term Slab J": "更纱等宽 Slab J",
+    "Sarasa Term Slab TC": "更纱等宽 Slab TC",
+    "Sarasa Fixed": "更纱等距",
+    "Sarasa Gothic SC": "更纱黑体 SC",
+    "Sarasa Gothic TC": "更纱黑体 TC",
+    "Sarasa Gothic J": "更纱黑体 J",
+    "Sarasa Gothic K": "更纱黑体 K",
+    "Microsoft JhengHei": "微软正黑体",
+    // === Japanese Fonts (new entries) ===
+    "A-OTF Ryumin Pr6N B-KL": "リュウミン Pr6N B-KL",
+    "A-OTF Ryumin Pr6N H-KL": "リュウミン Pr6N H-KL",
+    "BIZ UDGothic": "BIZ UDゴシック",
+    "BIZ UDMincho": "BIZ UD明朝",
+    "BestTen-CRT": "ベストテン CRT",
+    "Century Gothic": "センチュリーゴシック",
+    "Copperplate Gothic": "コッパープレート ゴシック",
+    "DFCraftYu-W5": "DFクラフト游 W5",
+    "DFGanKaiSho-W7": "DF岩楷書 W7",
+    "DFMaruMoji-SL": "DF丸文字 SL",
+    "DFMaruMojiRD-W7": "DF丸文字 RD W7",
+    "FOT-Comet Std": "FOT-コメット Std",
+    "FOT-MatisseEleganto Pro DB": "FOT-マティスエレガント Pro DB",
+    "FOT-Skip Std": "FOT-スキップ Std",
+    "FOT-UDKakugo_Large Pr6N DB": "FOT-UD角ゴ_Large Pr6N DB",
+    "UD Digi Kyokasho N": "UDデジタル教科書体 N",
+    "UD Digi Kyokasho NP": "UDデジタル教科書体 NP",
+    "UD Digi Kyokasho NK-R": "UDデジタル教科書体 NK-R",
+    "UD Digi Kyokasho N-R": "UDデジタル教科書体 N-R",
+    "Meiryo UI": "メイリオ UI",
+    "Noto Sans JP": "Noto Sans JP",
+    "Noto Serif JP": "Noto Serif JP",
+    "Nico Moji": "ニコ文字",
+    "Rounded M+ 1p": "Rounded M+ 1p",
+    "Showcard Gothic": "SHOWCARD ゴシック",
+    "Source Han Serif JP": "源ノ明朝 JP",
+    // Add more as needed...
+    "Meiryo with Source Han Sans": "メイリオ + 思源黑体",
+    "MZhiHei PRC": "M正黑体 PRC",
+    "HonyaJi-Re": "ホンヤジ Re",
+    "SimSun-ExtB": "宋体 扩展B",
+    "SimSun-ExtG": "宋体 扩展G",
+};
+
+// Heuristic replacements for Japanese -> native script
+const JP_REPLACEMENTS = [
+    [/(?:^|\s)Gothic/gi, " ゴシック"],
+    [/(?:^|\s)Mincho/gi, " 明朝"],
+    [/Ryumin/gi, "リュウミン"],
+    [/Maru/gi, "丸"],
+    [/Kaku/gi, "角"],
+    [/UD/gi, "UD"],
+];
+
+function autoJapaneseName(name) {
+    let result = name;
+    JP_REPLACEMENTS.forEach(([regex, rep]) => {
+        result = result.replace(regex, rep);
+    });
+    return result;
+}
+
+/**
+ * Returns localized display name.
+ */
+function getLocalizedFontName(name) {
+    if (LOCALIZED_FONT_NAME_MAP[name]) return LOCALIZED_FONT_NAME_MAP[name];
+    // If looks Japanese (simple heuristic) apply autop replace
+    if (/Gothic|Mincho|Ryumin|Kaku|Maru|ゴシック|明朝/i.test(name)) {
+        return autoJapaneseName(name);
+    }
+    return name;
+}
 

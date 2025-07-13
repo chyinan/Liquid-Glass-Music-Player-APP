@@ -76,7 +76,9 @@ fn get_system_fonts() -> Result<CategorizedFonts, String> {
 
     let looks_japanese = |fname: &str| {
         let patterns = [
-            "jp", "mincho", "gothic", "hiragino", "meiryo", "yu", "kozuka", "ipa", "hg", "ms pgothic", "ms gothic", "明朝", "ゴシック", "メイリオ","uzura"
+            "jp", "mincho", "gothic", "hiragino", "meiryo", "yu", "kozuka", "ipa", "hg", "ms pgothic", "ms gothic", "明朝", "ゴシック", "メイリオ","uzura",
+            // NEW additions for Fontworks / Morisawa naming
+            "kakugo", "marugo", "udkakugo", "udmarugo", "pr6n", "fot-", "morisawa", "kaku", "maru", "honya", "honyaji"
         ];
         let lname = fname.to_lowercase();
         patterns.iter().any(|p| lname.contains(p)) || fname.contains('ゴ') || fname.contains('リ')
@@ -84,7 +86,20 @@ fn get_system_fonts() -> Result<CategorizedFonts, String> {
 
     for (name, (is_zh, is_ja)) in font_names {
         match (is_zh, is_ja) {
-            (true, false) => zh_fonts.push(name),
+            (true, false) => {
+                if looks_japanese(&name) && !looks_chinese(&name) {
+                    ja_fonts.push(name);
+                } else if !looks_chinese(&name) {
+                    // Name doesn't look Chinese; if it's ascii treat as English, else put to other.
+                    if name.chars().all(|c| c.is_ascii()) {
+                        en_fonts.push(name);
+                    } else {
+                        other_fonts.push(name);
+                    }
+                } else {
+                    zh_fonts.push(name);
+                }
+            },
             (false, true) => ja_fonts.push(name),
             (true, true) => {
                 // Both languages detected, decide by heuristics on name
@@ -98,7 +113,12 @@ fn get_system_fonts() -> Result<CategorizedFonts, String> {
                 }
             }
             (false, false) => {
-                if name.chars().all(|c| c.is_ascii()) {
+                // If neither glyph heuristic matched, fall back to name patterns first.
+                if looks_japanese(&name) {
+                    ja_fonts.push(name);
+                } else if looks_chinese(&name) {
+                    zh_fonts.push(name);
+                } else if name.chars().all(|c| c.is_ascii()) {
                     en_fonts.push(name);
                 } else {
                     other_fonts.push(name);
