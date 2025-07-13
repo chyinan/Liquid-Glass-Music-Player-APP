@@ -13,14 +13,6 @@ use font_kit::handle::Handle;
 use font_kit::properties::{Style, Weight};
 
 #[derive(Serialize)]
-struct FontData {
-    name: String,
-    italic: bool,
-    weight: u16,
-    data: String,
-}
-
-#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CategorizedFonts {
     zh_fonts: Vec<String>,
@@ -417,12 +409,6 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
         album_art_base64,
         lyrics,
     })
-}
-
-#[derive(Deserialize)]
-struct GetFontDataPayload {
-    #[serde(rename = "fontName")]
-    font_name: String,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

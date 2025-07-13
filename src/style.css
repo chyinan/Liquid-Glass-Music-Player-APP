@@ -446,10 +446,10 @@ input[type="file"] { display: none; }
     text-align: center;
     min-height: 480px; /* Give panel a min-height for adaptive layout */
     
-    /* GPU优化 */
-    will-change: transform;
-    transform: translateZ(0.002px); /* 为玻璃面板创建独立复合层 */
-    backface-visibility: hidden;
+    /* GPU优化 - REMOVED to fix rendering artifacts at corners */
+    /* will-change: transform; */
+    /* transform: translateZ(0.002px); */
+    /* backface-visibility: hidden; */
 }
 
 .settings-wrapper { position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; z-index: 10; }
@@ -688,20 +688,20 @@ input[type="file"] { display: none; }
 
 /* --- Minimal Mode Styles (New) --- */
 #player-ui-glass.minimal-mode {
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(2px) saturate(180%);
-    -webkit-backdrop-filter: blur(2px) saturate(180%);
-    border: none; /* Remove hard border to prevent aliasing */
-    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2), 
-                inset 0 4px 20px rgba(255, 255, 255, 0.3),
-                inset 0 0 1.5px rgba(255, 255, 255, 0.5); /* Add soft inner shadow for a smoother border */
-    border-radius: 2rem;
-    color: white;
-    /* 保留原有布局相关属性 */
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 0px solid rgba(255, 255, 255, 0.18);
+    box-shadow: rgba(142, 142, 142, 0.19) 0px 6px 15px 0px;
+    -webkit-box-shadow: rgba(142, 142, 142, 0.19) 0px 6px 15px 0px;
+    border-radius: 25px;
+    -webkit-border-radius: 25px;
+    color: rgba(255, 255, 255, 0.6);
+    /* Retain essential layout properties from previous implementation */
     flex-direction: row;
     align-items: center;
     gap: 4rem;
-    padding: 4rem 6rem 4rem 6rem;
+    padding: 4rem 6rem;
     width: fit-content;
     min-width: 90vw;
     max-width: none;
@@ -712,33 +712,15 @@ input[type="file"] { display: none; }
     overflow: hidden;
 }
 
-/* 移除极简模式下的高光动画伪元素 */
 #player-ui-glass.minimal-mode::before {
-    display: none !important;
+    display: none;
 }
 
-/* Liquid glass effect from example */
 #player-ui-glass.minimal-mode::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 2rem;
-    backdrop-filter: blur(1px);
-    -webkit-backdrop-filter: blur(1px);
-    /* Simplified shadow for smoother highlights */
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), inset 0 -1px 1px rgba(255, 255, 255, 0.3);
-    opacity: 0.8; /* Increased opacity slightly for the new subtle effect */
-    z-index: -1;
-    /* Removed blur from filter as it's no longer needed to soften edges */
-    filter: drop-shadow(10px 4px 6px black) brightness(115%);
-    pointer-events: none;
+    display: none;
 }
 
-/* 移除极简模式下visual-container的径向高光 */
+/* 移除极简模式下的高光动画伪元素 */
 #player-ui-glass.minimal-mode #visual-container::before {
     display: none !important;
 }
