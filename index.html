@@ -59,8 +59,21 @@
                     <input type="checkbox" id="bold-translation-toggle">
                 </div>
                 <div class="setting-item">
+                    <label for="italic-original-toggle">原文斜体:</label>
+                    <input type="checkbox" id="italic-original-toggle">
+                </div>
+                <div class="setting-item">
+                    <label for="italic-translation-toggle">译文斜体:</label>
+                    <input type="checkbox" id="italic-translation-toggle">
+                </div>
+                <div class="setting-item">
                     <label for="lyrics-opacity-range">歌词不透明度:</label>
                     <input type="range" id="lyrics-opacity-range" min="0" max="100" value="100">
+                </div>
+                <!-- NEW: Text shadow toggle -->
+                <div class="setting-item">
+                    <label for="text-shadow-toggle">标题/歌手文字阴影:</label>
+                    <input type="checkbox" id="text-shadow-toggle">
                 </div>
             </div>
 
@@ -129,6 +142,11 @@
 
     <audio id="audioPlayer" preload="auto" crossorigin="anonymous" style="display: none;"></audio>
     
+    <!-- GitHub Link Button -->
+    <a id="githubLink" class="github-link" href="https://github.com/chyinan/Liquid-Glass-Music-Player-APP" title="View on GitHub">
+        <i class="fab fa-github"></i>
+    </a>
+
     <script type="module" src="./src/main.js"></script>
 </body>
 </html> 

@@ -32,13 +32,16 @@
     --accent-color: #fff;
     --background-color: #000;
     --adaptive-text-color: #f0f0f0; /* 自适应文字颜色 */
+    --adaptive-text-shadow: none; /* NEW: 自适应文字阴影 */
     --adaptive-progress-bg: rgba(255, 255, 255, 0.2); /* 自适应进度条背景 */
     --adaptive-progress-fill: #ffffff; /* 自适应进度条填充颜色 */
 
     /* 分离原文/译文字重 */
     --lyrics-font-weight-original: 700;   /* 默认原文加粗 */
     --lyrics-font-weight-translation: 400;/* 默认译文字重正常 */
-
+    --lyrics-font-style-original: normal; /* 默认原文字体样式 */
+    --lyrics-font-style-translation: normal; /* 默认译文字体样式 */
+    
     /* NEW: Language-specific font variables */
     --font-zh: 'Microsoft YaHei', sans-serif;
     --font-ja: 'MS Mincho', sans-serif;
@@ -493,12 +496,13 @@ input[type="file"] { display: none; }
     font-size: 1.3rem; /* Slightly smaller default title size */
     font-weight: 600;
     color: var(--adaptive-text-color);
+    text-shadow: var(--adaptive-text-shadow);
     line-height: 1.2;
-    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out;
     /* Prevent text wrapping during transitions for a smoother effect */
     white-space: normal; /* Allow wrapping by default */
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* overflow: hidden; (REMOVED to prevent shadow clipping) */
+    /* text-overflow: ellipsis; (REMOVED to prevent shadow clipping) */
     display: block; /* Revert to block */
 }
 
@@ -506,12 +510,13 @@ input[type="file"] { display: none; }
     font-family: 'Inter', sans-serif;
     font-size: 1.1rem;
     color: var(--adaptive-text-color);
+    text-shadow: var(--adaptive-text-shadow);
     line-height: 1.2;
-    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out;
     /* Prevent text wrapping during transitions for a smoother effect */
     white-space: normal; /* Allow wrapping by default */
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* overflow: hidden; (REMOVED to prevent shadow clipping) */
+    /* text-overflow: ellipsis; (REMOVED to prevent shadow clipping) */
     display: block; /* Revert to block */
 }
 
@@ -527,7 +532,8 @@ input[type="file"] { display: none; }
     font-size: 0.8rem;
     color: var(--adaptive-text-color);
     padding: 0 5px;
-    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+    text-shadow: var(--adaptive-text-shadow);
+    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out;
 }
 
 .progress-bar-container.simple { 
@@ -771,6 +777,7 @@ input[type="file"] { display: none; }
     font-size: clamp(2rem, 4vw, 5rem); /* Slightly smaller for minimal mode */
     font-weight: 700;
     letter-spacing: -2px;
+    text-shadow: var(--adaptive-text-shadow);
     /* Remove white-space: nowrap to allow wrapping */
     overflow: visible; /* Ensure text is visible */
     line-height: 1.1; /* Tighter line spacing */
@@ -782,6 +789,7 @@ input[type="file"] { display: none; }
     font-size: clamp(1.2rem, 2.5vw, 3rem); /* Increased font size range for bigger panel */
     font-weight: 500;
     opacity: 0.9;
+    text-shadow: var(--adaptive-text-shadow);
     /* Remove white-space: nowrap to allow wrapping */
     overflow: visible; /* Ensure text is visible */
     line-height: 1.2; /* Comfortable line spacing */
@@ -851,6 +859,10 @@ body.lyrics-active #player-wrapper {
 /* NEW: Make the glass UI fill the new wrapper height */
 body.lyrics-active #player-ui-glass {
     height: 100%;
+    /* 进一步降低玻璃亮度，并微调滤镜以增强对比度 */
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(16px) saturate(1.6) brightness(0.95);
 }
 
 /* --- Styling for Enlarged Player Content in Lyrics Mode --- */
@@ -950,6 +962,7 @@ body.lyrics-active .progress-bar-container.simple {
 .original-lyric {
     font-size: 4.0rem;
     font-weight: var(--lyrics-font-weight-original, 700);
+    font-style: var(--lyrics-font-style-original, normal);
 }
 
 /* Style for the smaller, translated lyric */
@@ -958,6 +971,7 @@ body.lyrics-active .progress-bar-container.simple {
     opacity: 0.8; /* Slightly less prominent */
     padding-left: 0.4rem; /* NEW: Slight indent to visually align with original */
     font-weight: var(--lyrics-font-weight-translation, 400);
+    font-style: var(--lyrics-font-style-translation, normal);
 }
 
 /* --- NEW: Language-based font-family rules --- */
@@ -1191,4 +1205,25 @@ body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .t
 
 .latin {
     font-family: var(--lyrics-font-english), sans-serif;
+}
+
+/* --- GitHub Link Button --- */
+.github-link {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    font-size: 2rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    z-index: 500;
+    transition: transform 0.2s, color 0.3s;
+}
+
+.github-link:hover {
+    color: #ffffff;
+    transform: scale(1.15);
+}
+
+.github-link i {
+    pointer-events: none;
 }

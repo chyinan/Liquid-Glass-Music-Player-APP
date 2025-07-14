@@ -1,7 +1,7 @@
 // ES 模块导入
 import { invoke } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { open } from '@tauri-apps/plugin-dialog';
+import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 // NEW: 引入语言识别库
 import { franc } from 'franc';
 
@@ -34,13 +34,17 @@ const noLyricsMessage = document.getElementById('no-lyrics-message');
 // NEW: Settings Elements
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsPanel = document.getElementById('settingsPanel');
+const githubLink = document.getElementById('githubLink'); // Get the GitHub link element
 // NEW: 更新为新的选择器ID
 const fontChineseSelect = document.getElementById('font-chinese-select');
 const fontJapaneseSelect = document.getElementById('font-japanese-select');
 const fontEnglishSelect = document.getElementById('font-english-select');
 const boldOriginalToggle = document.getElementById('bold-original-toggle');
 const boldTranslationToggle = document.getElementById('bold-translation-toggle');
+const italicOriginalToggle = document.getElementById('italic-original-toggle');
+const italicTranslationToggle = document.getElementById('italic-translation-toggle');
 const opacityRange = document.getElementById('lyrics-opacity-range');
+const textShadowToggle = document.getElementById('text-shadow-toggle'); // NEW: Get the shadow toggle element
 
 /**
  * Wrap ASCII/latin sequences with span.latin so他们使用英文字体
@@ -141,12 +145,33 @@ function applyLyricsBold(originalBold, translationBold) {
 }
 
 /**
+ * Applies font style (italic) based on italic toggle
+ * @param {boolean} originalItalic
+ * @param {boolean} translationItalic
+ */
+function applyLyricsItalic(originalItalic, translationItalic) {
+    document.documentElement.style.setProperty('--lyrics-font-style-original', originalItalic ? 'italic' : 'normal');
+    document.documentElement.style.setProperty('--lyrics-font-style-translation', translationItalic ? 'italic' : 'normal');
+}
+
+/**
  * Applies opacity based on the range value.
  * @param {number} value - The value from the range input (0-100).
  */
 function applyLyricsOpacity(value) {
     const alpha = Math.max(0, Math.min(100, value)) / 100;
     document.documentElement.style.setProperty('--lyrics-global-alpha', alpha.toString());
+}
+
+/**
+ * Applies text shadow based on the toggle's state.
+ * @param {boolean} isEnabled - Whether the shadow should be enabled.
+ */
+function applyTextShadow(isEnabled) {
+    const shadowStyle = isEnabled 
+        ? '0 1px 8px rgba(0, 0, 0, 0.7)' 
+        : 'none';
+    document.documentElement.style.setProperty('--adaptive-text-shadow', shadowStyle);
 }
 
 function populateFontSelectors(categorizedFonts) {
@@ -278,6 +303,15 @@ function setupSettings() {
     boldOriginalToggle.addEventListener('change', onBoldChange);
     boldTranslationToggle.addEventListener('change', onBoldChange);
 
+    // Italic toggle listeners
+    const onItalicChange = () => {
+        localStorage.setItem('lyricsItalicOriginal', italicOriginalToggle.checked ? '1' : '0');
+        localStorage.setItem('lyricsItalicTranslation', italicTranslationToggle.checked ? '1' : '0');
+        applyLyricsItalic(italicOriginalToggle.checked, italicTranslationToggle.checked);
+    };
+    italicOriginalToggle.addEventListener('change', onItalicChange);
+    italicTranslationToggle.addEventListener('change', onItalicChange);
+
     // Opacity range listener
     opacityRange.addEventListener('input', () => {
         const val = parseInt(opacityRange.value, 10);
@@ -285,7 +319,38 @@ function setupSettings() {
         applyLyricsOpacity(val);
     });
 
+    // NEW: Text shadow listener
+    textShadowToggle.addEventListener('change', () => {
+        const isEnabled = textShadowToggle.checked;
+        localStorage.setItem('textShadowEnabled', isEnabled ? '1' : '0');
+        applyTextShadow(isEnabled);
+    });
+
     loadAndPopulateFonts();
+
+    // === Restore Bold / Italic / Opacity settings ===
+    const savedBoldOriginal = localStorage.getItem('lyricsBoldOriginal') === '1';
+    const savedBoldTranslation = localStorage.getItem('lyricsBoldTranslation') === '1';
+    boldOriginalToggle.checked = savedBoldOriginal;
+    boldTranslationToggle.checked = savedBoldTranslation;
+    applyLyricsBold(savedBoldOriginal, savedBoldTranslation);
+
+    const savedItalicOriginal = localStorage.getItem('lyricsItalicOriginal') === '1';
+    const savedItalicTranslation = localStorage.getItem('lyricsItalicTranslation') === '1';
+    italicOriginalToggle.checked = savedItalicOriginal;
+    italicTranslationToggle.checked = savedItalicTranslation;
+    applyLyricsItalic(savedItalicOriginal, savedItalicTranslation);
+
+    const savedOpacity = parseInt(localStorage.getItem('lyricsOpacity'), 10);
+    if (!isNaN(savedOpacity)) {
+        opacityRange.value = savedOpacity;
+        applyLyricsOpacity(savedOpacity);
+    }
+    
+    // NEW: Restore text shadow setting
+    const savedTextShadow = localStorage.getItem('textShadowEnabled') === '1';
+    textShadowToggle.checked = savedTextShadow;
+    applyTextShadow(savedTextShadow);
 }
 
 
@@ -326,6 +391,39 @@ function setupSettings() {
         };
     }
 
+    function applyAdaptiveColors({ text, bgAlpha = 0.2 }) {
+        const root = document.documentElement.style;
+        root.setProperty('--adaptive-text-color', text);
+        root.setProperty('--adaptive-progress-fill', text);
+
+        let r = 255, g = 255, b = 255; // Default to white components
+
+        const rgbMatch = text.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgbMatch) {
+            r = parseInt(rgbMatch[1], 10);
+            g = parseInt(rgbMatch[2], 10);
+            b = parseInt(rgbMatch[3], 10);
+        } else if (text.startsWith('#')) {
+            const hex = text.substring(1);
+            if (hex.length === 3) {
+                r = parseInt(hex[0] + hex[0], 16);
+                g = parseInt(hex[1] + hex[1], 16);
+                b = parseInt(hex[2] + hex[2], 16);
+            } else if (hex.length === 6) {
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+            }
+        }
+        
+        root.setProperty('--adaptive-progress-bg', `rgba(${r},${g},${b},${bgAlpha})`);
+    }
+
+    function resetToDefault() {
+        // As requested, default to pure white for better contrast on dark backgrounds.
+        applyAdaptiveColors({ text: '#ffffff' });
+    }
+
     function analyzeImage(url) {
         return new Promise((resolve) => {
             const img = new Image();
@@ -339,16 +437,25 @@ function setupSettings() {
 
                 const sample = 1200;
                 let rSum = 0, gSum = 0, bSum = 0;
+
+                // NEW: Sample from a central rectangle in the bottom half of the image,
+                // as requested, to improve accuracy by focusing where text is.
+                const sampleXStart = w * 0.25; // Start 25% from the left
+                const sampleWidth = w * 0.5;   // Sample a 50% horizontal slice
+                const sampleYStart = h * 0.55; // Start from 55% down
+                const sampleHeight = h * 0.35; // Sample a 35% vertical slice
+
                 for (let i = 0; i < sample; i++) {
-                    const x = (Math.random() * w) | 0;
-                    const y = (Math.random() * h) | 0;
+                    const x = (sampleXStart + (Math.random() * sampleWidth)) | 0;
+                    const y = (sampleYStart + (Math.random() * sampleHeight)) | 0;
                     const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
                     rSum += r; gSum += g; bSum += b;
                 }
                 const r = rSum / sample;
                 const g = gSum / sample;
                 const b = bSum / sample;
-            const luminance = (r + g + b) / 3;
+                // Use perceptive luminance for better accuracy
+                const luminance = (r * 0.299 + g * 0.587 + b * 0.114);
                 resolve({ r, g, b, luminance });
             };
             img.onerror = () => resolve(null);
@@ -356,30 +463,29 @@ function setupSettings() {
         });
     }
 
-    function applyAdaptiveColors({ text, bgAlpha = 0.2 }) {
-        const root = document.documentElement.style;
-        root.setProperty('--adaptive-text-color', text);
-        root.setProperty('--adaptive-progress-fill', text);
-
-        const m = text.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (m) {
-            const r = m[1], g = m[2], b = m[3];
-            root.setProperty('--adaptive-progress-bg', `rgba(${r},${g},${b},${bgAlpha})`);
-        } else {
-            root.setProperty('--adaptive-progress-bg', 'rgba(255,255,255,0.2)');
-        }
-    }
-
-    function resetToDefault() {
-        applyAdaptiveColors({ text: '#f0f0f0' });
-    }
-
 // 获取当前窗口实例
 const appWindow = WebviewWindow.getCurrent();
 
 async function handleFile(filePath) {
-    showLoading('Analyzing Audio...');
+    if (!filePath) {
+        // This case handles when the user cancels the dialog
+        console.log("File selection was cancelled.");
+        return;
+    }
+    showLoading('Processing Audio...');
+
     try {
+        const metadata = await invoke("load_audio_file", { filePath });
+
+        // --- UI TRANSITION ---
+        // Hide file select, show player
+        fileSelectContainer.classList.add('hidden');
+        githubLink.classList.add('hidden'); // Hide the GitHub link
+        playerWrapper.classList.remove('hidden');
+
+        // Reset UI from previous track
+        resetPlayerUI();
+
         console.log('选择的文件:', filePath);
 
         parsedLyrics = [];
@@ -426,16 +532,27 @@ async function handleFile(filePath) {
 
             // 自适应颜色
             analyzeImage(artworkUrl).then((info) => {
-                if (!info) return resetToDefault();
+                if (!info) {
+                    // Fallback to white if analysis fails
+                    return resetToDefault();
+                }
+                
                 const { r, g, b, luminance } = info;
-                if (luminance < 150) {
-                    resetToDefault();
+
+                // If the bottom half is dark (luminance < 140), use white text.
+                // The threshold was increased from 128 to 140 to be more sensitive
+                // to darker backgrounds, ensuring white text is used more appropriately.
+                if (luminance < 140) {
+                    resetToDefault(); // Uses white text
                 } else {
+                    // If the bottom half is light, find a contrasting dark color.
                     const { h, s, l } = rgbToHsl(r, g, b);
-                    if (s < 0.15) {
-                        applyAdaptiveColors({ text: '#222222bf' });
+                    if (s < 0.2) {
+                        // For low saturation colors (grays), just use a dark gray.
+                        applyAdaptiveColors({ text: '#222222' });
                     } else {
-                        const newL = Math.max(0, l - 0.35);
+                        // For saturated colors, make it much darker.
+                        const newL = Math.max(0, l - 0.45);
                         const { r: dr, g: dg, b: db } = hslToRgb(h, s, newL);
                         const textColor = `rgb(${dr},${dg},${db})`;
                         applyAdaptiveColors({ text: textColor });
@@ -457,8 +574,8 @@ async function handleFile(filePath) {
         audioPlayer.load();
         audioPlayer.play().catch(e => console.error('Audio playback failed:', e));
 
-        fileSelectContainer.style.display = 'none';
-        playerWrapper.classList.remove('hidden');
+        // fileSelectContainer.style.display = 'none'; // This line is now handled by the new UI transition
+        // playerWrapper.classList.remove('hidden'); // This line is now handled by the new UI transition
 
     } catch (error) {
         console.error('处理音频时出错:', error);
@@ -489,7 +606,7 @@ audioPlayer.addEventListener('timeupdate', () => {
 
     loadBtn.addEventListener('click', async () => {
         try {
-            const selected = await open({
+            const selected = await dialogOpen({
                 multiple: false,
             filters: [{ name: 'Audio', extensions: ['mp3', 'flac', 'wav', 'm4a'] }]
             });
@@ -588,11 +705,14 @@ window.addEventListener('keydown', (event) => {
             toggleLyrics();
             break;
             case 'v':
-            // 在进入极简模式前，如果歌词模式是激活的，则先退出歌词模式
-            if (lyricsDisplayMode !== 0) { // Check against the new state
-                // Set mode to the last state (original) so the next toggle turns it off.
-                lyricsDisplayMode = 4; 
-                toggleLyrics(); // This will now cycle to 0 (off) and update the UI correctly.
+            // 在进入极简模式前，如果歌词模式处于激活状态，则强制先完全关闭歌词模式
+            if (lyricsDisplayMode !== 0) {
+                /*
+                 * 由于循环顺序是 0→2→3→4→1→0，想要“一步到位”关闭歌词，
+                 * 只需把 state 预设为 1（translation），toggleLyrics() 会立刻跳到 0(off)。
+                 */
+                lyricsDisplayMode = 1;
+                toggleLyrics();
             }
             // 切换极简模式
             const minimalActive = playerUIGlass.classList.toggle('minimal-mode');
@@ -937,6 +1057,23 @@ function showLyricsModeIndicator(mode) {
 document.addEventListener('DOMContentLoaded', () => {
     // All initial setup calls can go here.
     setupSettings();
+
+    // GitHub link click → open in system browser
+    const githubLinkEl = document.getElementById('githubLink');
+    if (githubLinkEl) {
+        githubLinkEl.addEventListener('click', (e) => {
+            e.preventDefault();
+            const url = githubLinkEl.getAttribute('href');
+            if (window.__TAURI__) {
+                // NEW: Correctly import from the shell plugin
+                import('@tauri-apps/plugin-shell').then(({ open }) => {
+                    open(url).catch(() => window.open(url, '_blank'));
+                }).catch(() => window.open(url, '_blank'));
+            } else {
+                window.open(url, '_blank');
+            }
+        });
+    }
 });
 
 // === NEW: Localized Font Name Mapping ===

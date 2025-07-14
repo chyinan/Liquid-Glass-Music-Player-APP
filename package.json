@@ -12,6 +12,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.6.0",
     "@tauri-apps/plugin-dialog": "^2.3.0",
+    "@tauri-apps/plugin-shell": "^2.3.0",
     "franc": "^6.2.0"
   },
   "devDependencies": {
