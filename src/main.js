@@ -475,8 +475,6 @@ async function handleFile(filePath) {
     showLoading('Processing Audio...');
 
     try {
-        const metadata = await invoke("load_audio_file", { filePath });
-
         // --- UI TRANSITION ---
         // Hide file select, show player
         fileSelectContainer.classList.add('hidden');
@@ -488,11 +486,6 @@ async function handleFile(filePath) {
 
         console.log('选择的文件:', filePath);
 
-        parsedLyrics = [];
-        lyricsLinesContainer.innerHTML = '';
-        noLyricsMessage.classList.add('hidden');
-        currentLyricIndex = -1;
-        
         const result = await invoke('process_audio_file', { path: encodeURIComponent(filePath) });
         console.log('处理结果:', result);
 
@@ -736,6 +729,39 @@ function showLoading(message) {
 
 function hideLoading() {
     loadingOverlay.classList.add('ui-hidden');
+}
+
+function resetPlayerUI() {
+    audioPlayer.pause();
+    audioPlayer.src = '';
+
+    songTitleEl.textContent = 'Unknown Title';
+    artistNameEl.textContent = 'Unknown Artist';
+    
+    currentTimeEl.textContent = '00:00';
+    durationEl.textContent = '00:00';
+    progressBarFill.style.width = '0%';
+    
+    if (artworkUrl) {
+        // data URLs don't need revoking
+        artworkUrl = null;
+    }
+    albumArt.src = '';
+    albumArt.style.display = 'none';
+    backgroundBlur.style.backgroundImage = 'none';
+    distortedBg.style.backgroundImage = 'none';
+    backgroundBlur.classList.remove('active');
+
+    resetToDefault(); // Resets adaptive text colors
+
+    // Clear and hide lyrics
+    parsedLyrics = [];
+    lyricsLinesContainer.innerHTML = '';
+    noLyricsMessage.classList.add('hidden');
+    currentLyricIndex = -1;
+    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original');
+    lyricsContainer.classList.add('hidden');
+    lyricsDisplayMode = 0; // Reset mode to off
 }
 
 function toggleLyrics() {
