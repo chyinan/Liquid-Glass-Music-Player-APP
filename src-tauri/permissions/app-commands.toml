@@ -10,3 +10,12 @@ commands.allow = ["get_system_fonts"]
 identifier = "allow-get-font-data"
 description = "Allows invoking the get_font_data command"
 commands.allow = ["get_font_data"] 
+[[permission]]
+identifier = "allow-prepare-audio-file"
+description = "Allows invoking the prepare_audio_file command"
+commands.allow = ["prepare_audio_file"] 
+
+[[permission]]
+identifier = "allow-cleanup-cached-file"
+description = "Allows invoking the cleanup_cached_file command"
+commands.allow = ["cleanup_cached_file"] 

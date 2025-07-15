@@ -1,5 +1,5 @@
 // ES 模块导入
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 // NEW: 引入语言识别库
@@ -69,6 +69,8 @@ loadingOverlay.classList.add('ui-hidden');
     let isPlaying = false;
     let isSeeking = false;
     let artworkUrl = null;
+// NEW: 当前正在播放的临时缓存文件路径，用于后续删除
+let currentAudioCachePath = null;
 // This old variable was causing the issue. It's now removed.
 let parsedLyrics = [];
 let currentLyricIndex = -1;
@@ -486,7 +488,18 @@ async function handleFile(filePath) {
 
         console.log('选择的文件:', filePath);
 
-        const result = await invoke('process_audio_file', { path: encodeURIComponent(filePath) });
+        // 如果之前有缓存文件，先让后端尝试删除
+        if (currentAudioCachePath) {
+            invoke('cleanup_cached_file', { path: currentAudioCachePath }).catch(() => {});
+            currentAudioCachePath = null;
+        }
+
+        const result = await invoke('prepare_audio_file', { path: encodeURIComponent(filePath) });
+
+        // 将返回的临时文件路径转换为可以在 WebView 中访问的 asset URL
+        const audioUrl = convertFileSrc(result.cachePath);
+        currentAudioCachePath = result.cachePath;
+
         console.log('处理结果:', result);
 
         if (result.lyrics) {
@@ -513,9 +526,9 @@ async function handleFile(filePath) {
             // applyMarquee(artistNameEl);
         }, 100);
 
-        if (result.album_art_base64) {
-            const mimeType = result.metadata.mime_type || 'image/jpeg';
-            artworkUrl = `data:${mimeType};base64,${result.album_art_base64}`;
+        if (result.albumArtBase64) {
+            const mimeType = result.metadata.mimeType || 'image/jpeg';
+            artworkUrl = `data:${mimeType};base64,${result.albumArtBase64}`;
 
             backgroundBlur.style.backgroundImage = `url(${artworkUrl})`;
             distortedBg.style.backgroundImage = `url(${artworkUrl})`;
@@ -563,7 +576,7 @@ async function handleFile(filePath) {
             resetToDefault();
         }
 
-        audioPlayer.src = `data:audio/wav;base64,${result.playback_data_base64}`;
+        audioPlayer.src = audioUrl;
         audioPlayer.load();
         audioPlayer.play().catch(e => console.error('Audio playback failed:', e));
 

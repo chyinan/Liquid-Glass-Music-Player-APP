@@ -13,6 +13,8 @@
     "allow-temp-read-recursive",
     "allow-get-system-fonts",
     "allow-get-font-data",
+    "allow-prepare-audio-file",
+    "allow-cleanup-cached-file",
     "core:event:default"
   ]
 }

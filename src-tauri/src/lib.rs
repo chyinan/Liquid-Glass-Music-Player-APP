@@ -202,6 +202,7 @@ struct Format {
 }
 
 #[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct Metadata {
     title: Option<String>,
     artist: Option<String>,
@@ -209,9 +210,19 @@ struct Metadata {
 }
 
 #[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct ProcessedFile {
     metadata: Metadata,
     playback_data_base64: String,
+    album_art_base64: Option<String>,
+    lyrics: Option<String>,
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PreparedFile {
+    metadata: Metadata,
+    cache_path: String,
     album_art_base64: Option<String>,
     lyrics: Option<String>,
 }
@@ -431,6 +442,212 @@ fn process_audio_file(path: String) -> Result<ProcessedFile, String> {
     })
 }
 
+#[tauri::command]
+fn prepare_audio_file(path: String) -> Result<PreparedFile, String> {
+    // Decode the URL-encoded path received from the frontend.
+    let path_decoded = urlencoding::decode(&path)
+        .map_err(|e| format!("Failed to decode path: {}", e))?
+        .into_owned();
+
+    let path = path_decoded;
+
+    // Ensure ffmpeg / ffprobe is available
+    ffmpeg_sidecar::download::auto_download()
+        .map_err(|e| format!("Failed to download ffmpeg: {}", e))?;
+
+    // ========== 1. 获取元数据 & 歌词（重用逻辑） ==========
+    // This reuses the same logic from process_audio_file to keep behaviour consistent.
+    let mut metadata = Metadata {
+        title: None,
+        artist: None,
+        mime_type: Some("image/jpeg".to_string()),
+    };
+    let mut lyrics = None;
+
+    // --- ffprobe metadata extraction (copy from existing implementation) ---
+    let mut ffprobe_cmd = std::process::Command::new("ffprobe");
+    ffprobe_cmd
+        .arg("-v")
+        .arg("quiet")
+        .arg("-print_format")
+        .arg("json")
+        .arg("-show_format")
+        .arg("-show_streams")
+        .arg("-i")
+        .arg(&path);
+
+    #[cfg(windows)]
+    ffprobe_cmd.creation_flags(0x08000000);
+
+    let ffprobe_output = ffprobe_cmd
+        .output()
+        .map_err(|e| format!("Failed to execute ffprobe: {}", e))?;
+
+    if ffprobe_output.status.success() {
+        let ffprobe_json: std::borrow::Cow<'_, str> = if let Ok(s) = std::str::from_utf8(&ffprobe_output.stdout) {
+            std::borrow::Cow::Borrowed(s)
+        } else {
+            let (decoded_utf16, _, had_errors_utf16) = UTF_16LE.decode(&ffprobe_output.stdout);
+            if !had_errors_utf16 {
+                decoded_utf16
+            } else {
+                let (decoded_gbk, _, _had_errors_gbk) = GBK.decode(&ffprobe_output.stdout);
+                decoded_gbk
+            }
+        };
+
+        if let Ok(probe_data) = serde_json::from_str::<FFProbeOutput>(&ffprobe_json) {
+            let mut combined_tags = probe_data.format.tags;
+            for stream in probe_data.streams {
+                if stream.codec_type == "audio" {
+                    combined_tags.extend(stream.tags);
+                    break;
+                }
+            }
+
+            metadata.title = combined_tags.get("title").cloned();
+            metadata.artist = combined_tags
+                .get("artist")
+                .or_else(|| combined_tags.get("ARTIST"))
+                .cloned();
+
+            lyrics = combined_tags
+                .get("lyrics")
+                .or_else(|| combined_tags.get("LYRICS"))
+                .cloned();
+
+            if lyrics.is_none() {
+                for (k, v) in &combined_tags {
+                    if k.to_lowercase().starts_with("lyrics") {
+                        lyrics = Some(v.clone());
+                        break;
+                    }
+                }
+            }
+
+            if metadata
+                .title
+                .as_ref()
+                .map(|t| t.trim().is_empty() || t.contains('\u{FFFD}'))
+                .unwrap_or(false)
+            {
+                metadata.title = None;
+            }
+            if metadata
+                .artist
+                .as_ref()
+                .map(|a| a.trim().is_empty() || a.contains('\u{FFFD}'))
+                .unwrap_or(false)
+            {
+                metadata.artist = None;
+            }
+        }
+    }
+
+    // Fallback to filename for title / artist if still missing
+    if let Some(file_stem_os) = std::path::Path::new(&path).file_stem() {
+        let file_stem_str = file_stem_os.to_string_lossy();
+        if metadata.title.is_none() {
+            metadata.title = Some(file_stem_str.to_string());
+        }
+        if metadata.artist.is_none() {
+            let parts: Vec<&str> = file_stem_str
+                .split('-')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if parts.len() >= 2 {
+                metadata.artist = Some(parts[0].to_string());
+                if let Some(ref t) = metadata.title {
+                    if t == &file_stem_str {
+                        metadata.title = Some(parts[1..].join(" - "));
+                    }
+                }
+            }
+        }
+    }
+
+    // ========== 2. 提取封面 ==========
+    let art_tempdir = tempfile::tempdir().map_err(|e| format!("Failed to create temp dir: {}", e))?;
+    let art_output_path = art_tempdir.path().join("cover.jpg");
+
+    let mut art_cmd = std::process::Command::new("ffmpeg");
+    art_cmd
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-i")
+        .arg(&path)
+        .arg("-an")
+        .arg("-vcodec")
+        .arg("copy")
+        .arg(art_output_path.to_str().unwrap());
+
+    #[cfg(windows)]
+    art_cmd.creation_flags(0x08000000);
+
+    let mut album_art_base64 = None;
+    if art_cmd.output().map(|o| o.status.success()).unwrap_or(false) {
+        if let Ok(data) = std::fs::read(&art_output_path) {
+            album_art_base64 = Some(general_purpose::STANDARD.encode(&data));
+        }
+    }
+
+    // ========== 3. 转码音频为 WAV，并保存到临时文件 ==========
+    // 使用系统临时目录，确保路径在 $TEMP 范围，方便 assetProtocol 访问。
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| format!("Time error: {}", e))?
+        .as_millis();
+    let cache_path = std::env::temp_dir().join(format!("imp_cache_{}.wav", timestamp));
+    let cache_path_str = cache_path
+        .to_str()
+        .ok_or_else(|| "Failed to convert cache path to string".to_string())?
+        .to_owned();
+
+    let mut wav_cmd = std::process::Command::new("ffmpeg");
+    wav_cmd
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-i")
+        .arg(&path)
+        .arg("-ac")
+        .arg("2")
+        .arg("-y")
+        .arg(&cache_path_str);
+
+    #[cfg(windows)]
+    wav_cmd.creation_flags(0x08000000);
+
+    let status = wav_cmd
+        .status()
+        .map_err(|e| format!("ffmpeg command failed to run: {}", e))?;
+
+    if !status.success() {
+        return Err("ffmpeg command for wav failed".to_string());
+    }
+
+    Ok(PreparedFile {
+        metadata,
+        cache_path: cache_path_str,
+        album_art_base64,
+        lyrics,
+    })
+}
+
+#[tauri::command]
+fn cleanup_cached_file(path: String) -> Result<(), String> {
+    if path.trim().is_empty() {
+        return Ok(());
+    }
+    match std::fs::remove_file(&path) {
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("Failed to remove cached file: {}", e)),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -439,7 +656,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             process_audio_file,
             get_system_fonts,
-            get_font_data
+            get_font_data,
+            prepare_audio_file,
+            cleanup_cached_file
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

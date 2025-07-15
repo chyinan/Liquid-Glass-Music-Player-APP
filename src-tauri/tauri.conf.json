@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "immersive-music-player",
-  "version": "1.2.0",
+  "version": "1.2.5",
   "identifier": "com.chyinan.immersivemusicplayer",
   "build": {
     "frontendDist": "../dist",
@@ -24,7 +24,11 @@
       "csp": null,
       "capabilities": [
         "default"
-      ]
+      ],
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$TEMP/**"]
+      }
     }
   },
   "bundle": {

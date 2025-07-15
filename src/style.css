@@ -1,11 +1,3 @@
-/* --- Font Import: Smiley Sans --- */
-@font-face {
-    font-family: 'Smiley Sans';
-    /* 强制浏览器加载项目根目录下的字体文件，并修正相对路径 */
-    src: url('../SmileySans-Oblique.ttf.woff2') format('woff2');
-    font-display: swap; /* 优化加载体验，防止文字消失 */
-}
-
 /* 
 === GPU硬件加速优化说明 ===
 本CSS已针对GPU性能进行优化：
