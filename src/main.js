@@ -477,12 +477,7 @@ async function handleFile(filePath) {
     showLoading('Processing Audio...');
 
     try {
-        // --- UI TRANSITION ---
-        // Hide file select, show player
-        fileSelectContainer.classList.add('hidden');
-        githubLink.classList.add('hidden'); // Hide the GitHub link
-        playerWrapper.classList.remove('hidden');
-
+        // 在真正准备就绪前保持文件选择页，仅显示 Loading 遮罩
         // Reset UI from previous track
         resetPlayerUI();
 
@@ -576,18 +571,38 @@ async function handleFile(filePath) {
             resetToDefault();
         }
 
-        audioPlayer.src = audioUrl;
-        audioPlayer.load();
-        audioPlayer.play().catch(e => console.error('Audio playback failed:', e));
+        // 设置音频并等待 metadata，确保进度条和时长已就绪
+        const finalizeTransition = () => {
+            fileSelectContainer.classList.add('hidden');
+            githubLink.classList.add('hidden');
+            playerWrapper.classList.remove('hidden');
+            hideLoading();
+        };
 
-        // fileSelectContainer.style.display = 'none'; // This line is now handled by the new UI transition
-        // playerWrapper.classList.remove('hidden'); // This line is now handled by the new UI transition
+        audioPlayer.src = audioUrl;
+
+        const readyHandler = () => {
+            finalizeTransition();
+            audioPlayer.removeEventListener('loadedmetadata', readyHandler);
+            audioPlayer.play().catch(e => console.error('Audio playback failed:', e));
+        };
+
+        // 如果 metadata 已经可用，就直接执行，否则等待事件
+        if (audioPlayer.readyState >= 1) {
+            readyHandler();
+        } else {
+            audioPlayer.addEventListener('loadedmetadata', readyHandler);
+            audioPlayer.load();
+        }
+
+        // 其余过渡均在 finalizeTransition 中处理
 
     } catch (error) {
         console.error('处理音频时出错:', error);
         alert(`Error: ${error}`);
-    } finally {
         hideLoading();
+    } finally {
+        // hideLoading 会在 finalizeTransition 中处理
     }
 }
 
