@@ -112,4 +112,4 @@ Immersive Music Player/
 
 ## 许可证
 
-MIT License © 2025 CHYINAN
+MIT License © 2025 chyinan
