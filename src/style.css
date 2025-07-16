@@ -27,6 +27,7 @@
     --adaptive-text-shadow: none; /* NEW: 自适应文字阴影 */
     --adaptive-progress-bg: rgba(255, 255, 255, 0.2); /* 自适应进度条背景 */
     --adaptive-progress-fill: #ffffff; /* 自适应进度条填充颜色 */
+    --info-text-opacity: 1; /* NEW: 标题/歌手不透明度 */
 
     /* 分离原文/译文字重 */
     --lyrics-font-weight-original: 700;   /* 默认原文加粗 */
@@ -80,6 +81,39 @@ body {
     -webkit-font-feature-settings: "locl" 1;
     font-feature-settings: "locl" 1;
 }
+
+/* NEW: Style for the custom color picker container */
+#custom-color-container.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* NEW: Style for the custom color picker */
+.settings-panel input[type="color"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 30px;
+    height: 30px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: transform 0.2s;
+}
+.settings-panel input[type="color"]::-webkit-color-swatch {
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+.settings-panel input[type="color"]::-moz-color-swatch {
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+.settings-panel input[type="color"]:hover {
+    transform: scale(1.1);
+}
+
 
 /* --- Blurred Background --- */
 #background-blur {
@@ -191,6 +225,19 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
+}
+
+.settings-group-title {
+    color: var(--primary-text-color);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.settings-group-title:first-of-type {
+    margin-top: 0;
 }
 
 .settings-panel h3 {
@@ -488,9 +535,10 @@ input[type="file"] { display: none; }
     font-size: 1.3rem; /* Slightly smaller default title size */
     font-weight: 600;
     color: var(--adaptive-text-color);
+    opacity: var(--info-text-opacity); /* NEW: Apply opacity */
     text-shadow: var(--adaptive-text-shadow);
     line-height: 1.2;
-    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out;
+    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out, opacity 0.3s ease-in-out; /* Add opacity transition */
     /* Prevent text wrapping during transitions for a smoother effect */
     white-space: normal; /* Allow wrapping by default */
     /* overflow: hidden; (REMOVED to prevent shadow clipping) */
@@ -502,9 +550,10 @@ input[type="file"] { display: none; }
     font-family: 'Inter', sans-serif;
     font-size: 1.1rem;
     color: var(--adaptive-text-color);
+    opacity: var(--info-text-opacity); /* NEW: Apply opacity */
     text-shadow: var(--adaptive-text-shadow);
     line-height: 1.2;
-    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out;
+    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out, opacity 0.3s ease-in-out; /* Add opacity transition */
     /* Prevent text wrapping during transitions for a smoother effect */
     white-space: normal; /* Allow wrapping by default */
     /* overflow: hidden; (REMOVED to prevent shadow clipping) */
@@ -523,9 +572,10 @@ input[type="file"] { display: none; }
     justify-content: space-between;
     font-size: 0.8rem;
     color: var(--adaptive-text-color);
+    opacity: var(--info-text-opacity); /* NEW: Apply opacity */
     padding: 0 5px;
     text-shadow: var(--adaptive-text-shadow);
-    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out;
+    transition: color 0.8s ease-in-out, font-size 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), text-shadow 0.3s ease-in-out, opacity 0.3s ease-in-out; /* Add opacity transition */
 }
 
 .progress-bar-container.simple { 

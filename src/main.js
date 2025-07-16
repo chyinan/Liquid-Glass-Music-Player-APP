@@ -2,6 +2,8 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
+// NEW: Import shell.open from plugin-shell to launch default system browser
+import { open as openInBrowser } from '@tauri-apps/plugin-shell';
 // NEW: 引入语言识别库
 import { franc } from 'franc';
 
@@ -45,6 +47,12 @@ const italicOriginalToggle = document.getElementById('italic-original-toggle');
 const italicTranslationToggle = document.getElementById('italic-translation-toggle');
 const opacityRange = document.getElementById('lyrics-opacity-range');
 const textShadowToggle = document.getElementById('text-shadow-toggle'); // NEW: Get the shadow toggle element
+// NEW: Get new control elements
+const adaptiveColorToggle = document.getElementById('adaptive-color-toggle');
+const customColorPicker = document.getElementById('custom-color-picker');
+const customColorContainer = document.getElementById('custom-color-container');
+const textOpacityRange = document.getElementById('text-opacity-range');
+
 
 /**
  * Wrap ASCII/latin sequences with span.latin so他们使用英文字体
@@ -175,6 +183,16 @@ function applyTextShadow(isEnabled) {
         : 'none';
     document.documentElement.style.setProperty('--adaptive-text-shadow', shadowStyle);
 }
+
+/**
+ * Applies text opacity based on the range value.
+ * @param {number} value - The value from the range input (0-100).
+ */
+function applyTextOpacity(value) {
+    const alpha = Math.max(0, Math.min(100, value)) / 100;
+    document.documentElement.style.setProperty('--info-text-opacity', alpha.toString());
+}
+
 
 function populateFontSelectors(categorizedFonts) {
     const { zhFonts, jaFonts, enFonts, otherFonts } = categorizedFonts;
@@ -328,6 +346,33 @@ function setupSettings() {
         applyTextShadow(isEnabled);
     });
 
+    // NEW: Adaptive color and custom color listeners
+    adaptiveColorToggle.addEventListener('change', () => {
+        const isEnabled = adaptiveColorToggle.checked;
+        localStorage.setItem('adaptiveColorEnabled', isEnabled ? '1' : '0');
+        // Disable/enable custom color picker
+        customColorContainer.classList.toggle('disabled', isEnabled);
+        // Re-apply colors based on the new state
+        updateAdaptiveColors();
+    });
+
+    customColorPicker.addEventListener('input', () => {
+        const color = customColorPicker.value;
+        localStorage.setItem('customColor', color);
+        // Only apply if adaptive colors are off
+        if (!adaptiveColorToggle.checked) {
+            updateAdaptiveColors();
+        }
+    });
+
+    // NEW: Text opacity listener
+    textOpacityRange.addEventListener('input', () => {
+        const value = parseInt(textOpacityRange.value, 10);
+        localStorage.setItem('textOpacity', value.toString());
+        applyTextOpacity(value);
+    });
+
+
     loadAndPopulateFonts();
 
     // === Restore Bold / Italic / Opacity settings ===
@@ -353,6 +398,25 @@ function setupSettings() {
     const savedTextShadow = localStorage.getItem('textShadowEnabled') === '1';
     textShadowToggle.checked = savedTextShadow;
     applyTextShadow(savedTextShadow);
+    
+    // NEW: Restore adaptive color, custom color, and text opacity
+    const savedAdaptiveEnabled = localStorage.getItem('adaptiveColorEnabled') !== '0'; // Default to true
+    adaptiveColorToggle.checked = savedAdaptiveEnabled;
+    customColorContainer.classList.toggle('disabled', savedAdaptiveEnabled);
+
+    const savedCustomColor = localStorage.getItem('customColor') || '#ffffff';
+    customColorPicker.value = savedCustomColor;
+    
+    const savedTextOpacity = parseInt(localStorage.getItem('textOpacity'), 10);
+    if (!isNaN(savedTextOpacity)) {
+        textOpacityRange.value = savedTextOpacity;
+        applyTextOpacity(savedTextOpacity);
+    } else {
+        applyTextOpacity(100); // Default
+    }
+
+    // Initial color application
+    updateAdaptiveColors();
 }
 
 
@@ -426,6 +490,20 @@ function setupSettings() {
         applyAdaptiveColors({ text: '#ffffff' });
     }
 
+    function updateAdaptiveColors() {
+        if (adaptiveColorToggle.checked) {
+            // If there's album art, re-run analysis. Otherwise, reset to default.
+            if (artworkUrl) {
+                analyzeImageAndApplyColors(artworkUrl);
+            } else {
+                resetToDefault();
+            }
+        } else {
+            // Use the custom color from the picker.
+            applyAdaptiveColors({ text: customColorPicker.value });
+        }
+    }
+
     function analyzeImage(url) {
         return new Promise((resolve) => {
             const img = new Image();
@@ -462,6 +540,37 @@ function setupSettings() {
             };
             img.onerror = () => resolve(null);
             img.src = url;
+        });
+    }
+
+    function analyzeImageAndApplyColors(imageUrl) {
+        analyzeImage(imageUrl).then((info) => {
+            if (!info) {
+                // Fallback to white if analysis fails
+                return resetToDefault();
+            }
+            
+            const { r, g, b, luminance } = info;
+    
+            // If the bottom half is dark (luminance < 140), use white text.
+            // The threshold was increased from 128 to 140 to be more sensitive
+            // to darker backgrounds, ensuring white text is used more appropriately.
+            if (luminance < 140) {
+                resetToDefault(); // Uses white text
+            } else {
+                // If the bottom half is light, find a contrasting dark color.
+                const { h, s, l } = rgbToHsl(r, g, b);
+                if (s < 0.2) {
+                    // For low saturation colors (grays), just use a dark gray.
+                    applyAdaptiveColors({ text: '#222222' });
+                } else {
+                    // For saturated colors, make it much darker.
+                    const newL = Math.max(0, l - 0.45);
+                    const { r: dr, g: dg, b: db } = hslToRgb(h, s, newL);
+                    const textColor = `rgb(${dr},${dg},${db})`;
+                    applyAdaptiveColors({ text: textColor });
+                }
+            }
         });
     }
 
@@ -532,34 +641,7 @@ async function handleFile(filePath) {
             albumArt.style.display = 'block';
 
             // 自适应颜色
-            analyzeImage(artworkUrl).then((info) => {
-                if (!info) {
-                    // Fallback to white if analysis fails
-                    return resetToDefault();
-                }
-                
-                const { r, g, b, luminance } = info;
-
-                // If the bottom half is dark (luminance < 140), use white text.
-                // The threshold was increased from 128 to 140 to be more sensitive
-                // to darker backgrounds, ensuring white text is used more appropriately.
-                if (luminance < 140) {
-                    resetToDefault(); // Uses white text
-                } else {
-                    // If the bottom half is light, find a contrasting dark color.
-                    const { h, s, l } = rgbToHsl(r, g, b);
-                    if (s < 0.2) {
-                        // For low saturation colors (grays), just use a dark gray.
-                        applyAdaptiveColors({ text: '#222222' });
-                    } else {
-                        // For saturated colors, make it much darker.
-                        const newL = Math.max(0, l - 0.45);
-                        const { r: dr, g: dg, b: db } = hslToRgb(h, s, newL);
-                        const textColor = `rgb(${dr},${dg},${db})`;
-                        applyAdaptiveColors({ text: textColor });
-                    }
-                }
-            });
+            updateAdaptiveColors();
         } else {
             // No album art
             backgroundBlur.style.backgroundImage = 'none';
@@ -568,7 +650,7 @@ async function handleFile(filePath) {
             albumArt.src = '';
             albumArt.style.display = 'none';
 
-            resetToDefault();
+            updateAdaptiveColors();
         }
 
         // 设置音频并等待 metadata，确保进度条和时长已就绪
@@ -781,6 +863,7 @@ function resetPlayerUI() {
     backgroundBlur.classList.remove('active');
 
     resetToDefault(); // Resets adaptive text colors
+    updateAdaptiveColors(); // Re-apply correct colors based on settings
 
     // Clear and hide lyrics
     parsedLyrics = [];
@@ -1051,6 +1134,8 @@ function renderAllLyricsOnce() {
         
         // FIX: Reverted to using `line.text` and added a fallback for empty lines.
         let originalText = line.text || '';
+        // NEW: Auto-replace problematic glyphs for meta lines
+        originalText = fixProblemGlyphs(originalText);
         // REMOVED: The confusing and ineffective meta-regex check block is gone.
         // The logic for determining "hasTranslation" is now correctly handled in toggleLyrics.
         
@@ -1077,6 +1162,17 @@ function renderAllLyricsOnce() {
         li.appendChild(translationSpan);
         lyricsLinesContainer.appendChild(li);
     });
+}
+
+// === NEW: Utility to fix problematic glyphs in metadata lines ===
+/**
+ * Replaces problematic simplified glyphs with traditional forms
+ * currently for "作词"→"作詞" and "编曲"→"編曲".
+ * @param {string} text original text
+ * @returns {string}
+ */
+function fixProblemGlyphs(text) {
+    return text.replace(/作词/g, '作詞').replace(/编曲/g, '編曲');
 }
 
 // --- NEW: Lyrics Mode Indicator ---
@@ -1119,10 +1215,8 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const url = githubLinkEl.getAttribute('href');
             if (window.__TAURI__) {
-                // NEW: Correctly import from the shell plugin
-                import('@tauri-apps/plugin-shell').then(({ open }) => {
-                    open(url).catch(() => window.open(url, '_blank'));
-                }).catch(() => window.open(url, '_blank'));
+                // Use plugin-shell to open URL
+                openInBrowser(url).catch(() => window.open(url, '_blank'));
             } else {
                 window.open(url, '_blank');
             }
