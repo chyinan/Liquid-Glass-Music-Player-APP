@@ -52,6 +52,7 @@ const adaptiveColorToggle = document.getElementById('adaptive-color-toggle');
 const customColorPicker = document.getElementById('custom-color-picker');
 const customColorContainer = document.getElementById('custom-color-container');
 const textOpacityRange = document.getElementById('text-opacity-range');
+const fontInterfaceSelect = document.getElementById('font-interface-select');
 
 
 /**
@@ -114,16 +115,17 @@ function injectFontFace(fontDataB64, fontFamilyName) {
 /**
  * Applies the selected fonts by fetching their data and injecting them.
  */
-async function applyLyricsFonts() {
+async function applySelectedFonts() {
     const fontSelectors = {
         zh: fontChineseSelect,
         ja: fontJapaneseSelect,
         en: fontEnglishSelect,
+        interface: fontInterfaceSelect, // NEW: Add interface font
     };
 
-    for (const [lang, selectElement] of Object.entries(fontSelectors)) {
+    for (const [type, selectElement] of Object.entries(fontSelectors)) {
         const selectedFont = selectElement.value;
-        const dynamicFontName = `dynamic-font-${lang}`;
+        const dynamicFontName = `dynamic-font-${type}`;
 
         if (selectedFont) {
             try {
@@ -132,15 +134,15 @@ async function applyLyricsFonts() {
                 // 动态注入 @font-face
                 injectFontFace(fontDataB64, dynamicFontName);
                 // 应用动态字体
-                document.documentElement.style.setProperty(`--font-${lang}`, `'${dynamicFontName}'`);
+                document.documentElement.style.setProperty(`--font-${type}`, `'${dynamicFontName}'`);
             } catch (error) {
                 console.error(`Failed to load font ${selectedFont}:`, error);
                 // 加载失败则回退到无衬线字体
-                document.documentElement.style.setProperty(`--font-${lang}`, 'sans-serif');
+                document.documentElement.style.setProperty(`--font-${type}`, 'sans-serif');
             }
         } else {
             // 如果选择“默认”，则回退
-            document.documentElement.style.setProperty(`--font-${lang}`, 'sans-serif');
+            document.documentElement.style.setProperty(`--font-${type}`, type === 'interface' ? "'Inter', sans-serif" : 'sans-serif');
         }
     }
 }
@@ -228,6 +230,7 @@ function populateFontSelectors(categorizedFonts) {
     populateWithGroups(fontChineseSelect);
     populateWithGroups(fontJapaneseSelect);
     populateWithGroups(fontEnglishSelect);
+    populateWithGroups(fontInterfaceSelect); // NEW: Populate interface font selector
 }
 
 async function loadAndPopulateFonts() {
@@ -239,6 +242,7 @@ async function loadAndPopulateFonts() {
         const savedZhFont = localStorage.getItem('font-zh');
         const savedJaFont = localStorage.getItem('font-ja');
         const savedEnFont = localStorage.getItem('font-en');
+        const savedInterfaceFont = localStorage.getItem('font-interface'); // NEW: Restore interface font
 
         if (savedZhFont) {
             fontChineseSelect.value = savedZhFont;
@@ -252,6 +256,10 @@ async function loadAndPopulateFonts() {
             fontEnglishSelect.value = savedEnFont;
             updateFontVariable('--font-en', savedEnFont);
         }
+        if (savedInterfaceFont) { // NEW: Apply restored interface font
+            fontInterfaceSelect.value = savedInterfaceFont;
+            updateFontVariable('--font-interface', savedInterfaceFont);
+        }
 
     } catch (error) {
         console.error("Failed to load system fonts:", error);
@@ -263,7 +271,11 @@ function updateFontVariable(variable, fontName) {
         document.documentElement.style.setProperty(variable, `'${fontName}', sans-serif`);
     } else {
         // Revert to default
-        document.documentElement.style.removeProperty(variable);
+        if (variable === '--font-interface') {
+            document.documentElement.style.setProperty(variable, "'Inter', sans-serif");
+        } else {
+            document.documentElement.style.removeProperty(variable);
+        }
     }
 }
 
@@ -286,6 +298,12 @@ fontEnglishSelect.addEventListener('change', (e) => {
     updateFontVariable('--font-en', fontName);
 });
 
+fontInterfaceSelect.addEventListener('change', (e) => { // NEW: Interface font listener
+    const fontName = e.target.value;
+    localStorage.setItem('font-interface', fontName);
+    updateFontVariable('--font-interface', fontName);
+});
+
 /**
  * Sets up all event listeners and initial state for the settings panel.
  */
@@ -306,13 +324,15 @@ function setupSettings() {
         localStorage.setItem('lyricsFontChinese', fontChineseSelect.value);
         localStorage.setItem('lyricsFontJapanese', fontJapaneseSelect.value);
         localStorage.setItem('lyricsFontEnglish', fontEnglishSelect.value);
-        await applyLyricsFonts();
+        localStorage.setItem('fontInterface', fontInterfaceSelect.value); // NEW: Save interface font
+        await applySelectedFonts();
     };
 
     // NEW: 监听新的下拉框
     fontChineseSelect.addEventListener('change', onChange);
     fontJapaneseSelect.addEventListener('change', onChange);
     fontEnglishSelect.addEventListener('change', onChange);
+    fontInterfaceSelect.addEventListener('change', onChange); // NEW: Add listener for interface font
 
     // Bold toggle listeners
     const onBoldChange = () => {

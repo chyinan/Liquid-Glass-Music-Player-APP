@@ -28,6 +28,7 @@
     --adaptive-progress-bg: rgba(255, 255, 255, 0.2); /* 自适应进度条背景 */
     --adaptive-progress-fill: #ffffff; /* 自适应进度条填充颜色 */
     --info-text-opacity: 1; /* NEW: 标题/歌手不透明度 */
+    --font-interface: 'Inter', sans-serif; /* NEW: 界面字体 */
 
     /* 分离原文/译文字重 */
     --lyrics-font-weight-original: 700;   /* 默认原文加粗 */
@@ -531,7 +532,7 @@ input[type="file"] { display: none; }
 #audio-info { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
 
 .info-title {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-interface);
     font-size: 1.3rem; /* Slightly smaller default title size */
     font-weight: 600;
     color: var(--adaptive-text-color);
@@ -547,7 +548,7 @@ input[type="file"] { display: none; }
 }
 
 .info-artist {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-interface);
     font-size: 1.1rem;
     color: var(--adaptive-text-color);
     opacity: var(--info-text-opacity); /* NEW: Apply opacity */
@@ -570,7 +571,7 @@ input[type="file"] { display: none; }
     width: 100%;
     display: flex;
     justify-content: space-between;
-    font-size: 0.8rem;
+    font-size: 0.9rem; /* Increased from 0.8rem */
     color: var(--adaptive-text-color);
     opacity: var(--info-text-opacity); /* NEW: Apply opacity */
     padding: 0 5px;
