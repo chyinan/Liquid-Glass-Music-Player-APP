@@ -94,25 +94,29 @@ body {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    width: 30px;
-    height: 30px;
+    width: 1.6em;
+    height: 1.6em;
     background-color: transparent;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.2); /* Restore outer border */
+    border-radius: 0.35em;
     cursor: pointer;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    transition: transform 0.2s;
+    transform: translateY(-0.075em);
+    padding: 0;
+    margin: 0;
+}
+.settings-panel input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0; /* Remove inner padding so swatch fills the box */
 }
 .settings-panel input[type="color"]::-webkit-color-swatch {
-    border-radius: 50%;
-    border: 2px solid #fff;
+    border: none; /* Remove default border */
+    border-radius: 0.35em; /* Match outer */
 }
 .settings-panel input[type="color"]::-moz-color-swatch {
-    border-radius: 50%;
-    border: 2px solid #fff;
+    border: none;
+    border-radius: 0.35em;
 }
 .settings-panel input[type="color"]:hover {
-    transform: scale(1.1);
+    border-color: rgba(255, 255, 255, 0.6);
 }
 
 
