@@ -84,7 +84,7 @@ let currentAudioCachePath = null;
 let parsedLyrics = [];
 let currentLyricIndex = -1;
 // NEW: State for lyrics display mode
-// 0: off, 1: translation only, 2: bilingual (orig/trans), 3: bilingual-reversed (trans/orig), 4: original only
+// 0: off, 1: translation only, 2: bilingual (orig/trans), 3: bilingual-reversed (trans/orig), 4: original only, 5: text only
 let lyricsDisplayMode = 0;
 
 // === NEW: Settings and Font Management (Refactored) ===
@@ -831,10 +831,11 @@ window.addEventListener('keydown', (event) => {
             // 在进入极简模式前，如果歌词模式处于激活状态，则强制先完全关闭歌词模式
             if (lyricsDisplayMode !== 0) {
                 /*
-                 * 由于循环顺序是 0→2→3→4→1→0，想要“一步到位”关闭歌词，
-                 * 只需把 state 预设为 1（translation），toggleLyrics() 会立刻跳到 0(off)。
+                 * 想要“一步到位”关闭歌词, 只需把 state 预设为能切换到 0 的模式,
+                 * 然后调用 toggleLyrics() 就会立刻跳到 0(off)。
+                 * 当前能切换到 0 的模式是 5 (纯文字模式)。
                  */
-                lyricsDisplayMode = 1;
+                lyricsDisplayMode = 5; // The mode before 'off' is now 5 (Text Only)
                 toggleLyrics();
             }
             // 切换极简模式
@@ -890,7 +891,7 @@ function resetPlayerUI() {
     lyricsLinesContainer.innerHTML = '';
     noLyricsMessage.classList.add('hidden');
     currentLyricIndex = -1;
-    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original');
+    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original', 'lyrics-mode-text-only');
     lyricsContainer.classList.add('hidden');
     lyricsDisplayMode = 0; // Reset mode to off
 }
@@ -904,19 +905,22 @@ function toggleLyrics() {
 
     // If there's no translation, just toggle between off (0) and original (4).
     if (!hasTranslation) {
-        if (lyricsDisplayMode === 0) {
-            lyricsDisplayMode = 4; // From off, go to original
-        } else {
-            lyricsDisplayMode = 0; // From original, go to off
-        }
+        // NEW Cycle with Text-Only: Off(0) -> Original(4) -> Text Only(5) -> Off(0)
+        const nextModeMap = {
+            0: 4, // Off -> Original
+            4: 5, // Original -> Text Only
+            5: 0, // Text Only -> Off
+        };
+        lyricsDisplayMode = nextModeMap[lyricsDisplayMode] ?? 0;
     } else {
-        // Corrected Cycle: Off(0) -> Bilingual(2) -> Reversed(3) -> Original(4) -> Translation(1) -> Off(0)
+        // Cycle with new mode: Off(0) -> Bilingual(2) -> Reversed(3) -> Original(4) -> Translation(1) -> Text Only(5) -> Off(0)
         const nextModeMap = {
             0: 2, // Off -> Bilingual
             2: 3, // Bilingual -> Bilingual Reversed
             3: 4, // Bilingual Reversed -> Original
             4: 1, // Original -> Translation
-            1: 0  // Translation -> Off
+            1: 5, // Translation -> Text Only
+            5: 0  // Text Only -> Off
         };
         lyricsDisplayMode = nextModeMap[lyricsDisplayMode] ?? 0; // Default to Off if state is weird
     }
@@ -928,7 +932,7 @@ function toggleLyrics() {
     lyricsContainer.classList.toggle('hidden', !lyricsActive);
 
     // Remove all mode classes before adding the new one
-    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original');
+    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original', 'lyrics-mode-text-only');
 
     if (lyricsActive) {
         document.body.classList.add('lyrics-active');
@@ -948,6 +952,10 @@ function toggleLyrics() {
             case 4: // Original only
                 modeString = 'original';
                 document.body.classList.add('lyrics-mode-original');
+                break;
+            case 5: // Text Only (NEW)
+                modeString = 'text-only';
+                document.body.classList.add('lyrics-mode-text-only');
                 break;
         }
         // Now that we have the correct mode string, show the indicator.
@@ -1208,7 +1216,8 @@ function showLyricsModeIndicator(mode) {
         'original': { icon: 'Aあ', text: '原文模式' },
         'translation': { icon: '译', text: '译文模式' },
         'bilingual': { icon: 'Aあ<br>译', text: '双语模式' },
-        'bilingual-reversed': { icon: '译<br>Aあ', text: '双语模式 (反转)' }
+        'bilingual-reversed': { icon: '译<br>Aあ', text: '双语模式 (反转)' },
+        'text-only': { icon: '文', text: '纯文字模式' }
     };
 
     const config = modeMap[mode] || { icon: '?', text: '未知模式' };

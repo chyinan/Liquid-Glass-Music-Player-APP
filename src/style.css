@@ -164,10 +164,10 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
     justify-content: center;
     
     /* GPU优化 & 动画准备 */
-    will-change: transform;
+    will-change: transform, opacity;
     transform: translateZ(0.005px);
     backface-visibility: hidden;
-    transition: transform 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+    transition: transform 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.5s ease-in-out;
 }
 
 /* --- Minimal Mode Container Override --- */
@@ -753,8 +753,8 @@ input[type="file"] { display: none; }
     /* Retain essential layout properties from previous implementation */
     flex-direction: row;
     align-items: center;
-    gap: 4rem;
-    padding: 4rem 6rem;
+    gap: 6rem;
+    padding: 4rem 8rem;
     width: fit-content;
     min-width: 90vw;
     max-width: none;
@@ -790,8 +790,8 @@ input[type="file"] { display: none; }
 }
 
 #player-ui-glass.minimal-mode #visual-container {
-    width: clamp(300px, 25vh, 400px); /* Responsive size based on viewport height */
-    height: clamp(300px, 25vh, 400px); /* Responsive size based on viewport height */
+    width: clamp(420px, 40vh, 520px); /* Responsive size based on viewport height */
+    height: clamp(420px, 40vh, 520px); /* Responsive size based on viewport height */
     margin: 0;
     flex-shrink: 0;
     position: relative; /* 确保伪元素正确定位 */
@@ -1213,6 +1213,36 @@ body.lyrics-mode-bilingual-reversed .lyrics-line:has(.translated-lyric:empty) .t
     transform: translate(-50%, -50%) scale(1);
     pointer-events: auto;
 }
+
+/* --- NEW: Text-Only Lyrics Mode --- */
+/* In text-only mode, hide the player completely */
+body.lyrics-mode-text-only .container {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Make lyrics container full-width and centered */
+body.lyrics-mode-text-only #lyrics-container {
+    width: 100vw;
+    height: 100vh;
+    left: 0;
+    right: 0;
+    align-items: center; /* Center horizontally */
+    padding: 2rem 5vw; /* Adjust padding for full screen */
+}
+
+/* Center the individual lyric lines and their content */
+body.lyrics-mode-text-only .lyrics-line {
+    align-items: center; /* Center content (original/translation) inside the line */
+    transform-origin: center center; /* Scale from the center */
+}
+
+/* The text inside original/translated spans should also be centered. */
+body.lyrics-mode-text-only .original-lyric,
+body.lyrics-mode-text-only .translated-lyric {
+    text-align: center;
+}
+
 
 .indicator-content {
     display: flex;
