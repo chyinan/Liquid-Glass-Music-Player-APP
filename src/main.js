@@ -53,6 +53,8 @@ const customColorPicker = document.getElementById('custom-color-picker');
 const customColorContainer = document.getElementById('custom-color-container');
 const textOpacityRange = document.getElementById('text-opacity-range');
 const fontInterfaceSelect = document.getElementById('font-interface-select');
+const customBgBtn = document.getElementById('custom-bg-btn');
+const removeBgBtn = document.getElementById('remove-bg-btn');
 
 
 /**
@@ -435,8 +437,43 @@ function setupSettings() {
         applyTextOpacity(100); // Default
     }
 
+    // Restore custom background
+    const savedBgPath = localStorage.getItem('customBgPath');
+    if (savedBgPath) {
+        const bgUrl = convertFileSrc(savedBgPath);
+        setCustomBackground(bgUrl);
+    }
+
+
     // Initial color application
     updateAdaptiveColors();
+}
+
+/**
+ * Sets a custom background image.
+ * @param {string} url - The URL of the image to set.
+ */
+function setCustomBackground(url) {
+    backgroundBlur.style.backgroundImage = `url(${url})`;
+    distortedBg.style.backgroundImage = `url(${url})`;
+    backgroundBlur.classList.add('active');
+}
+
+/**
+ * Removes the custom background and reverts to the default (album art).
+ */
+function removeCustomBackground() {
+    localStorage.removeItem('customBgPath');
+    // If a song is loaded, revert to its artwork, otherwise clear.
+    if (artworkUrl) {
+        backgroundBlur.style.backgroundImage = `url(${artworkUrl})`;
+        distortedBg.style.backgroundImage = `url(${artworkUrl})`;
+        backgroundBlur.classList.add('active');
+    } else {
+        backgroundBlur.style.backgroundImage = 'none';
+        distortedBg.style.backgroundImage = 'none';
+        backgroundBlur.classList.remove('active');
+    }
 }
 
 
@@ -654,9 +691,12 @@ async function handleFile(filePath) {
             const mimeType = result.metadata.mimeType || 'image/jpeg';
             artworkUrl = `data:${mimeType};base64,${result.albumArtBase64}`;
 
-            backgroundBlur.style.backgroundImage = `url(${artworkUrl})`;
-            distortedBg.style.backgroundImage = `url(${artworkUrl})`;
-            backgroundBlur.classList.add('active');
+            // NEW: Only set album art as bg if no custom bg is active
+            if (!localStorage.getItem('customBgPath')) {
+                backgroundBlur.style.backgroundImage = `url(${artworkUrl})`;
+                distortedBg.style.backgroundImage = `url(${artworkUrl})`;
+                backgroundBlur.classList.add('active');
+            }
             albumArt.src = artworkUrl;
             albumArt.style.display = 'block';
 
@@ -664,9 +704,13 @@ async function handleFile(filePath) {
             updateAdaptiveColors();
         } else {
             // No album art
-            backgroundBlur.style.backgroundImage = 'none';
-            distortedBg.style.backgroundImage = 'none';
-            backgroundBlur.classList.remove('active');
+            artworkUrl = null; // Ensure artworkUrl is null
+            // NEW: Only clear bg if no custom bg is active
+            if (!localStorage.getItem('customBgPath')) {
+                backgroundBlur.style.backgroundImage = 'none';
+                distortedBg.style.backgroundImage = 'none';
+                backgroundBlur.classList.remove('active');
+            }
             albumArt.src = '';
             albumArt.style.display = 'none';
 
@@ -677,6 +721,7 @@ async function handleFile(filePath) {
         const finalizeTransition = () => {
             fileSelectContainer.classList.add('hidden');
             githubLink.classList.add('hidden');
+            settingsBtn.classList.add('hidden'); // Hide settings icon
             playerWrapper.classList.remove('hidden');
             hideLoading();
         };
@@ -866,6 +911,13 @@ function resetPlayerUI() {
     audioPlayer.pause();
     audioPlayer.src = '';
 
+    // NEW: When resetting, show the file select screen and global controls again
+    fileSelectContainer.classList.remove('hidden');
+    githubLink.classList.remove('hidden');
+    settingsBtn.classList.remove('hidden');
+    playerWrapper.classList.add('hidden');
+
+
     songTitleEl.textContent = 'Unknown Title';
     artistNameEl.textContent = 'Unknown Artist';
     
@@ -879,9 +931,18 @@ function resetPlayerUI() {
     }
     albumArt.src = '';
     albumArt.style.display = 'none';
-    backgroundBlur.style.backgroundImage = 'none';
-    distortedBg.style.backgroundImage = 'none';
-    backgroundBlur.classList.remove('active');
+
+    // Revert to custom background if it exists, otherwise clear
+    const savedBgPath = localStorage.getItem('customBgPath');
+    if (savedBgPath) {
+        const bgUrl = convertFileSrc(savedBgPath);
+        setCustomBackground(bgUrl);
+    } else {
+        backgroundBlur.style.backgroundImage = 'none';
+        distortedBg.style.backgroundImage = 'none';
+        backgroundBlur.classList.remove('active');
+    }
+
 
     resetToDefault(); // Resets adaptive text colors
     updateAdaptiveColors(); // Re-apply correct colors based on settings
@@ -1236,6 +1297,27 @@ function showLyricsModeIndicator(mode) {
 document.addEventListener('DOMContentLoaded', () => {
     // All initial setup calls can go here.
     setupSettings();
+
+    // Custom background button listeners
+    customBgBtn.addEventListener('click', async () => {
+        try {
+            const selected = await dialogOpen({
+                multiple: false,
+                filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }]
+            });
+            if (selected) {
+                localStorage.setItem('customBgPath', selected);
+                const bgUrl = convertFileSrc(selected);
+                setCustomBackground(bgUrl);
+            }
+        } catch (e) {
+            console.error("Error opening image dialog", e);
+        }
+    });
+
+    removeBgBtn.addEventListener('click', () => {
+        removeCustomBackground();
+    });
 
     // GitHub link click → open in system browser
     const githubLinkEl = document.getElementById('githubLink');
