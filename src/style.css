@@ -29,6 +29,7 @@
     --adaptive-progress-fill: #ffffff; /* 自适应进度条填充颜色 */
     --info-text-opacity: 1; /* NEW: 标题/歌手不透明度 */
     --font-interface: 'Inter', sans-serif; /* NEW: 界面字体 */
+    --bg-blur-radius: 50px; /* NEW: 背景模糊半径 */
 
     /* 分离原文/译文字重 */
     --lyrics-font-weight-original: 700;   /* 默认原文加粗 */
@@ -130,7 +131,7 @@ body {
     bottom: -30px;
     background-size: cover; /* 保持原始比例 */
     background-position: center;
-    filter: blur(50px) brightness(0.8); /* Slightly increased brightness */
+    filter: blur(var(--bg-blur-radius)) brightness(0.8); /* Slightly increased brightness */
     z-index: -1;
     opacity: 0;
     transition: opacity 0.8s ease-in-out;

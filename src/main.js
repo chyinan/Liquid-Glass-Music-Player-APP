@@ -55,6 +55,7 @@ const textOpacityRange = document.getElementById('text-opacity-range');
 const fontInterfaceSelect = document.getElementById('font-interface-select');
 const customBgBtn = document.getElementById('custom-bg-btn');
 const removeBgBtn = document.getElementById('remove-bg-btn');
+const bgBlurRange = document.getElementById('bg-blur-range');
 
 
 /**
@@ -195,6 +196,15 @@ function applyTextShadow(isEnabled) {
 function applyTextOpacity(value) {
     const alpha = Math.max(0, Math.min(100, value)) / 100;
     document.documentElement.style.setProperty('--info-text-opacity', alpha.toString());
+}
+
+/**
+ * Applies background blur radius based on the range value.
+ * @param {number} value - The value from the range input (e.g., 20-100).
+ */
+function applyBgBlur(value) {
+    const radius = Math.max(10, Math.min(100, value));
+    document.documentElement.style.setProperty('--bg-blur-radius', `${radius}px`);
 }
 
 
@@ -394,6 +404,12 @@ function setupSettings() {
         applyTextOpacity(value);
     });
 
+    bgBlurRange.addEventListener('input', () => {
+        const value = parseInt(bgBlurRange.value, 10);
+        localStorage.setItem('bgBlur', value.toString());
+        applyBgBlur(value);
+    });
+
 
     loadAndPopulateFonts();
 
@@ -435,6 +451,14 @@ function setupSettings() {
         applyTextOpacity(savedTextOpacity);
     } else {
         applyTextOpacity(100); // Default
+    }
+
+    const savedBgBlur = parseInt(localStorage.getItem('bgBlur'), 10);
+    if (!isNaN(savedBgBlur)) {
+        bgBlurRange.value = savedBgBlur;
+        applyBgBlur(savedBgBlur);
+    } else {
+        applyBgBlur(50); // Default
     }
 
     // Restore custom background
