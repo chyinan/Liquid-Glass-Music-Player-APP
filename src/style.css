@@ -47,9 +47,10 @@ body {
     color: var(--primary-text-color);
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    /* 移除 flex 布局，改用绝对定位居中 .container */
+    /* display: flex; */
+    /* align-items: center; */
+    /* justify-content: center; */
     min-height: 100vh;
     overflow: hidden;
 
@@ -63,11 +64,11 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 
-    /* FINAL FIX: Force stable hardware acceleration context for the entire page to prevent flickering on complex animations */
-    -webkit-transform: translate3d(0, 0, 0);
-    transform: translate3d(0, 0, 0);
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
+    /* FINAL FIX: 移除 transform, 因为它会将 body 变成 fixed 定位元素的容器, 导致布局问题 */
+    /* -webkit-transform: translate3d(0, 0, 0); */
+    /* transform: translate3d(0, 0, 0); */
+    /* -webkit-backface-visibility: hidden; */
+    /* backface-visibility: hidden; */
 }
 
 /* 强制所有使用中文字体的地方启用简体中文字形特性 */
@@ -156,6 +157,12 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
 
 /* --- Main Container --- */
 .container {
+    /* NEW: 使用绝对定位和 transform 在 body 内居中 */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
     width: 100%;
     max-width: 90vw;
     max-height: 90vh;
@@ -165,7 +172,7 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
     
     /* GPU优化 & 动画准备 */
     will-change: transform, opacity;
-    transform: translateZ(0.005px);
+    /* transform: translateZ(0.005px); */ /* 被上面的 transform 覆盖，所以注释掉 */
     backface-visibility: hidden;
     transition: transform 0.7s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.5s ease-in-out;
 }
@@ -907,7 +914,7 @@ body.lyrics-active #lyrics-container {
 
 /* NEW: When lyrics are active, move the entire player container to the left */
 body.lyrics-active .container {
-    transform: translateX(-23vw); /* Move further left to accommodate wider lyrics */
+    transform: translate(calc(-50% - 23vw), -50%); /* 保持垂直居中 */
 }
 
 /* NEW: Enlarge the player itself when lyrics are active to fill the red box */
