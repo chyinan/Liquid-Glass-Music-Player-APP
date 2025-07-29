@@ -54,7 +54,8 @@ const customColorContainer = document.getElementById('custom-color-container');
 const textOpacityRange = document.getElementById('text-opacity-range');
 const fontInterfaceSelect = document.getElementById('font-interface-select');
 const customBgBtn = document.getElementById('custom-bg-btn');
-const removeBgBtn = document.getElementById('remove-bg-btn');
+const customBgContainer = document.getElementById('custom-bg-container');
+const albumArtBgToggle = document.getElementById('album-art-bg-toggle');
 const bgBlurRange = document.getElementById('bg-blur-range');
 
 
@@ -410,6 +411,12 @@ function setupSettings() {
         applyBgBlur(value);
     });
 
+    albumArtBgToggle.addEventListener('change', () => {
+        const isEnabled = albumArtBgToggle.checked;
+        localStorage.setItem('albumArtBgEnabled', isEnabled ? '1' : '0');
+        updateBackgrounds();
+    });
+
 
     loadAndPopulateFonts();
 
@@ -461,16 +468,53 @@ function setupSettings() {
         applyBgBlur(50); // Default
     }
 
-    // Restore custom background
+    // Restore album art background toggle state
+    const savedAlbumArtBgEnabled = localStorage.getItem('albumArtBgEnabled') !== '0'; // Default to true
+    albumArtBgToggle.checked = savedAlbumArtBgEnabled;
+
+    // Restore custom background (path only)
     const savedBgPath = localStorage.getItem('customBgPath');
     if (savedBgPath) {
-        const bgUrl = convertFileSrc(savedBgPath);
-        setCustomBackground(bgUrl);
+        // Just ensure the path is known, updateBackgrounds will handle the rest.
+    }
+    
+    // Initial UI update for background controls
+    updateBackgrounds();
+}
+
+/**
+ * CORE BACKGROUND LOGIC: Updates all background layers based on current settings.
+ * This is the single source of truth for background changes.
+ */
+function updateBackgrounds() {
+    const useAlbumArtBg = albumArtBgToggle.checked;
+    const customBgPath = localStorage.getItem('customBgPath');
+
+    // Rule 1: Control the custom background selector UI
+    customBgContainer.classList.toggle('disabled', useAlbumArtBg);
+
+    // Rule 2: Determine player's distorted background (always album art if available)
+    if (artworkUrl) {
+        distortedBg.style.backgroundImage = `url(${artworkUrl})`;
+    } else {
+        distortedBg.style.backgroundImage = 'none';
     }
 
+    // Rule 3: Determine the main, bottom-layer background
+    let finalBgUrl = null;
+    if (useAlbumArtBg) {
+        finalBgUrl = artworkUrl; // Use album art if toggle is on
+    } else if (customBgPath) {
+        finalBgUrl = convertFileSrc(customBgPath); // Fallback to custom BG if toggle is off
+    }
 
-    // Initial color application
-    updateAdaptiveColors();
+    if (finalBgUrl) {
+        backgroundBlur.style.backgroundImage = `url(${finalBgUrl})`;
+        backgroundBlur.classList.add('active');
+    } else {
+        backgroundBlur.style.backgroundImage = 'none';
+        backgroundBlur.classList.remove('active');
+    }
 }
 
 /**
@@ -479,8 +523,10 @@ function setupSettings() {
  */
 function setCustomBackground(url) {
     backgroundBlur.style.backgroundImage = `url(${url})`;
-    distortedBg.style.backgroundImage = `url(${url})`;
+    // Note: distortedBg is NOT set here. It should always reflect the current album art.
     backgroundBlur.classList.add('active');
+    // Save the path for persistence -- THIS WAS THE BUG. The caller now handles saving the raw path.
+    // localStorage.setItem('customBgPath', url);
 }
 
 /**
@@ -714,32 +760,19 @@ async function handleFile(filePath) {
         if (result.albumArtBase64) {
             const mimeType = result.metadata.mimeType || 'image/jpeg';
             artworkUrl = `data:${mimeType};base64,${result.albumArtBase64}`;
-
-            // NEW: Only set album art as bg if no custom bg is active
-            if (!localStorage.getItem('customBgPath')) {
-                backgroundBlur.style.backgroundImage = `url(${artworkUrl})`;
-                distortedBg.style.backgroundImage = `url(${artworkUrl})`;
-                backgroundBlur.classList.add('active');
-            }
             albumArt.src = artworkUrl;
             albumArt.style.display = 'block';
-
-            // 自适应颜色
-            updateAdaptiveColors();
+            analyzeImageAndApplyColors(artworkUrl);
         } else {
-            // No album art
-            artworkUrl = null; // Ensure artworkUrl is null
-            // NEW: Only clear bg if no custom bg is active
-            if (!localStorage.getItem('customBgPath')) {
-                backgroundBlur.style.backgroundImage = 'none';
-                distortedBg.style.backgroundImage = 'none';
-                backgroundBlur.classList.remove('active');
-            }
+            // No artwork found.
+            artworkUrl = '';
             albumArt.src = '';
             albumArt.style.display = 'none';
-
-            updateAdaptiveColors();
+            resetToDefault();
         }
+
+        // After updating artworkUrl, refresh all backgrounds
+        updateBackgrounds();
 
         // 设置音频并等待 metadata，确保进度条和时长已就绪
         const finalizeTransition = () => {
@@ -956,20 +989,8 @@ function resetPlayerUI() {
     albumArt.src = '';
     albumArt.style.display = 'none';
 
-    // Revert to custom background if it exists, otherwise clear
-    const savedBgPath = localStorage.getItem('customBgPath');
-    if (savedBgPath) {
-        const bgUrl = convertFileSrc(savedBgPath);
-        setCustomBackground(bgUrl);
-    } else {
-        backgroundBlur.style.backgroundImage = 'none';
-        distortedBg.style.backgroundImage = 'none';
-        backgroundBlur.classList.remove('active');
-    }
-
-
-    resetToDefault(); // Resets adaptive text colors
-    updateAdaptiveColors(); // Re-apply correct colors based on settings
+    // After clearing song-specific data, update backgrounds based on persistent settings
+    updateBackgrounds();
 
     // Clear and hide lyrics
     parsedLyrics = [];
@@ -1331,16 +1352,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (selected) {
                 localStorage.setItem('customBgPath', selected);
-                const bgUrl = convertFileSrc(selected);
-                setCustomBackground(bgUrl);
+                updateBackgrounds(); // Update UI immediately
             }
         } catch (e) {
             console.error("Error opening image dialog", e);
         }
-    });
-
-    removeBgBtn.addEventListener('click', () => {
-        removeCustomBackground();
     });
 
     // GitHub link click → open in system browser

@@ -91,6 +91,11 @@ body {
     pointer-events: none;
 }
 
+#custom-bg-container.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 /* NEW: Style for the custom color picker */
 .settings-panel input[type="color"] {
     -webkit-appearance: none;
@@ -227,7 +232,7 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 1000;
     text-align: left;
-    width: 250px;
+    width: 320px;
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 0.3s, transform 0.3s;
@@ -304,7 +309,7 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
     border: 1px solid #555;
     border-radius: 4px;
     padding: 0.3rem 0.5rem;
-    width: 150px; /* Adjust as needed */
+    width: 180px; /* Adjust as needed */
 }
 
 /* === NEW: Glassmorphism Inputs === */
@@ -357,7 +362,7 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
 .settings-panel input[type="range"] {
     -webkit-appearance: none;
     appearance: none;
-    width: 150px;
+    width: 180px;
     height: 20px; /* Taller to make it easier to click */
     background: transparent;
     cursor: pointer;
