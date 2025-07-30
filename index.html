@@ -21,6 +21,8 @@
     </svg>
 
     <div id="background-blur"></div>
+    <!-- NEW: Video element for dynamic background -->
+    <video id="background-video" autoplay muted loop playsinline></video>
 
     <div class="settings-icon-container" id="settingsBtn">
         <i class="fas fa-cog"></i>
@@ -82,14 +84,18 @@
             <input type="checkbox" id="album-art-bg-toggle" checked>
         </div>
         <div class="setting-item" id="custom-bg-container">
-            <label>自定义背景图:</label>
+            <label>自定义背景:</label>
             <div class="button-group">
                 <button id="custom-bg-btn" class="settings-button">选择图片</button>
+                <!-- NEW: Add button for selecting video background -->
+                <button id="custom-bg-video-btn" class="settings-button">选择视频</button>
+                <!-- NEW: Add a button to clear the custom background -->
+                <button id="clear-custom-bg-btn" class="settings-button">清除背景</button>
             </div>
         </div>
         <div class="setting-item" id="bg-blur-setting">
             <label for="bg-blur-range">背景模糊度:</label>
-            <input type="range" id="bg-blur-range" min="10" max="100" value="50">
+            <input type="range" id="bg-blur-range" min="0" max="100" value="50">
         </div>
 
         <!-- 歌词样式 -->

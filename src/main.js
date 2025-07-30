@@ -57,6 +57,10 @@ const customBgBtn = document.getElementById('custom-bg-btn');
 const customBgContainer = document.getElementById('custom-bg-container');
 const albumArtBgToggle = document.getElementById('album-art-bg-toggle');
 const bgBlurRange = document.getElementById('bg-blur-range');
+// NEW: Get the video background element and the new buttons
+const backgroundVideo = document.getElementById('background-video');
+const customBgVideoBtn = document.getElementById('custom-bg-video-btn');
+const clearCustomBgBtn = document.getElementById('clear-custom-bg-btn');
 
 
 /**
@@ -89,6 +93,8 @@ let parsedLyrics = [];
 let currentLyricIndex = -1;
 // NEW: State for lyrics display mode
 // 0: off, 1: translation only, 2: bilingual (orig/trans), 3: bilingual-reversed (trans/orig), 4: original only, 5: text only
+// NEW: Add mode 6 for text-only-reversed
+// 0: off, 1: translation only, 2: bilingual (orig/trans), 3: bilingual-reversed (trans/orig), 4: original only, 5: text only, 6: text only (reversed)
 let lyricsDisplayMode = 0;
 
 // === NEW: Settings and Font Management (Refactored) ===
@@ -204,7 +210,7 @@ function applyTextOpacity(value) {
  * @param {number} value - The value from the range input (e.g., 20-100).
  */
 function applyBgBlur(value) {
-    const radius = Math.max(10, Math.min(100, value));
+    const radius = Math.max(0, Math.min(100, value));
     document.documentElement.style.setProperty('--bg-blur-radius', `${radius}px`);
 }
 
@@ -489,6 +495,7 @@ function setupSettings() {
 function updateBackgrounds() {
     const useAlbumArtBg = albumArtBgToggle.checked;
     const customBgPath = localStorage.getItem('customBgPath');
+    const customBgVideoPath = localStorage.getItem('customBgVideoPath'); // NEW: Get video path
 
     // Rule 1: Control the custom background selector UI
     customBgContainer.classList.toggle('disabled', useAlbumArtBg);
@@ -502,18 +509,33 @@ function updateBackgrounds() {
 
     // Rule 3: Determine the main, bottom-layer background
     let finalBgUrl = null;
+    let finalVideoUrl = null;
+
     if (useAlbumArtBg) {
         finalBgUrl = artworkUrl; // Use album art if toggle is on
+    } else if (customBgVideoPath) {
+        finalVideoUrl = convertFileSrc(customBgVideoPath); // Prioritize video
     } else if (customBgPath) {
-        finalBgUrl = convertFileSrc(customBgPath); // Fallback to custom BG if toggle is off
+        finalBgUrl = convertFileSrc(customBgPath); // Fallback to custom image BG
     }
 
+    // Apply image background
     if (finalBgUrl) {
         backgroundBlur.style.backgroundImage = `url(${finalBgUrl})`;
         backgroundBlur.classList.add('active');
     } else {
         backgroundBlur.style.backgroundImage = 'none';
         backgroundBlur.classList.remove('active');
+    }
+
+    // Apply video background
+    if (finalVideoUrl) {
+        backgroundVideo.src = finalVideoUrl;
+        backgroundVideo.classList.add('active');
+        backgroundVideo.play();
+    } else {
+        backgroundVideo.src = '';
+        backgroundVideo.classList.remove('active');
     }
 }
 
@@ -933,11 +955,15 @@ window.addEventListener('keydown', (event) => {
             // 在进入极简模式前，如果歌词模式处于激活状态，则强制先完全关闭歌词模式
             if (lyricsDisplayMode !== 0) {
                 /*
-                 * 想要“一步到位”关闭歌词, 只需把 state 预设为能切换到 0 的模式,
-                 * 然后调用 toggleLyrics() 就会立刻跳到 0(off)。
-                 * 当前能切换到 0 的模式是 5 (纯文字模式)。
+                 * FIX: To turn lyrics off in one go, we must set the mode
+                 * to whichever state precedes 'off' (0) in the cycle.
+                 * This now depends on whether a translation is available.
                  */
-                lyricsDisplayMode = 5; // The mode before 'off' is now 5 (Text Only)
+                const metaRegex = /(作[词詞]|作曲|编曲|編曲|詞|曲|译|arranger|composer|lyricist|lyrics|ti|ar|al|by)/i;
+                const hasTranslation = parsedLyrics.some(l => l.translation && !metaRegex.test(l.text));
+
+                // Set to the mode that will cycle to 0. It's 6 if translation exists, otherwise 5.
+                lyricsDisplayMode = hasTranslation ? 6 : 5;
                 toggleLyrics();
             }
             // 切换极简模式
@@ -997,7 +1023,7 @@ function resetPlayerUI() {
     lyricsLinesContainer.innerHTML = '';
     noLyricsMessage.classList.add('hidden');
     currentLyricIndex = -1;
-    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original', 'lyrics-mode-text-only');
+    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original', 'lyrics-mode-text-only', 'lyrics-mode-text-only-reversed');
     lyricsContainer.classList.add('hidden');
     lyricsDisplayMode = 0; // Reset mode to off
 }
@@ -1019,14 +1045,15 @@ function toggleLyrics() {
         };
         lyricsDisplayMode = nextModeMap[lyricsDisplayMode] ?? 0;
     } else {
-        // Cycle with new mode: Off(0) -> Bilingual(2) -> Reversed(3) -> Original(4) -> Translation(1) -> Text Only(5) -> Off(0)
+        // Cycle with new modes: Off(0) -> Bilingual(2) -> Reversed(3) -> Original(4) -> Translation(1) -> Text Only(5) -> Text Only Reversed(6) -> Off(0)
         const nextModeMap = {
             0: 2, // Off -> Bilingual
             2: 3, // Bilingual -> Bilingual Reversed
             3: 4, // Bilingual Reversed -> Original
             4: 1, // Original -> Translation
             1: 5, // Translation -> Text Only
-            5: 0  // Text Only -> Off
+            5: 6, // Text Only -> Text Only Reversed
+            6: 0  // Text Only Reversed -> Off
         };
         lyricsDisplayMode = nextModeMap[lyricsDisplayMode] ?? 0; // Default to Off if state is weird
     }
@@ -1038,7 +1065,7 @@ function toggleLyrics() {
     lyricsContainer.classList.toggle('hidden', !lyricsActive);
 
     // Remove all mode classes before adding the new one
-    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original', 'lyrics-mode-text-only');
+    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original', 'lyrics-mode-text-only', 'lyrics-mode-text-only-reversed');
 
     if (lyricsActive) {
         document.body.classList.add('lyrics-active');
@@ -1062,6 +1089,10 @@ function toggleLyrics() {
             case 5: // Text Only (NEW)
                 modeString = 'text-only';
                 document.body.classList.add('lyrics-mode-text-only');
+                break;
+            case 6: // Text Only Reversed (NEW)
+                modeString = 'text-only-reversed';
+                document.body.classList.add('lyrics-mode-text-only-reversed');
                 break;
         }
         // Now that we have the correct mode string, show the indicator.
@@ -1323,7 +1354,8 @@ function showLyricsModeIndicator(mode) {
         'translation': { icon: '译', text: '译文模式' },
         'bilingual': { icon: 'Aあ<br>译', text: '双语模式' },
         'bilingual-reversed': { icon: '译<br>Aあ', text: '双语模式 (反转)' },
-        'text-only': { icon: '文', text: '纯文字模式' }
+        'text-only': { icon: '文', text: '纯文字模式' },
+        'text-only-reversed': { icon: '译<br>文', text: '纯文字模式 (反转)' }
     };
 
     const config = modeMap[mode] || { icon: '?', text: '未知模式' };
@@ -1352,11 +1384,38 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (selected) {
                 localStorage.setItem('customBgPath', selected);
+                // NEW: When setting an image, clear any video to avoid conflicts
+                localStorage.removeItem('customBgVideoPath');
                 updateBackgrounds(); // Update UI immediately
             }
         } catch (e) {
             console.error("Error opening image dialog", e);
         }
+    });
+
+    // NEW: Listener for custom video background
+    customBgVideoBtn.addEventListener('click', async () => {
+        try {
+            const selected = await dialogOpen({
+                multiple: false,
+                filters: [{ name: 'Video', extensions: ['mp4', 'webm', 'mov'] }]
+            });
+            if (selected) {
+                localStorage.setItem('customBgVideoPath', selected);
+                // NEW: When setting a video, clear any image to avoid conflicts
+                localStorage.removeItem('customBgPath');
+                updateBackgrounds();
+            }
+        } catch (e) {
+            console.error("Error opening video dialog", e);
+        }
+    });
+
+    // NEW: Listener to clear any custom background
+    clearCustomBgBtn.addEventListener('click', () => {
+        localStorage.removeItem('customBgPath');
+        localStorage.removeItem('customBgVideoPath');
+        updateBackgrounds();
     });
 
     // GitHub link click → open in system browser

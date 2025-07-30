@@ -152,6 +152,28 @@ body {
     animation: slowBackgroundFlow 120s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
 }
 
+/* --- NEW: Video Background --- */
+#background-video {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    min-width: 100%;
+    min-height: 100%;
+    width: auto;
+    height: auto;
+    z-index: -2; /* Place it behind the image blur overlay */
+    transform: translateX(-50%) translateY(-50%);
+    background-size: cover;
+    filter: blur(var(--bg-blur-radius)) brightness(0.8);
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+}
+
+#background-video.active {
+    opacity: 1;
+}
+
+
 #background-blur.active {
     opacity: 1;
 }
@@ -232,7 +254,7 @@ body:has(#player-ui-glass.minimal-mode) #background-blur {
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 1000;
     text-align: left;
-    width: 320px;
+    width: 380px; /* NEW: Increased width to prevent wrapping */
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 0.3s, transform 0.3s;
@@ -1331,4 +1353,45 @@ body.lyrics-mode-text-only .translated-lyric {
 
 .github-link i {
     pointer-events: none;
+}
+
+/* --- NEW: Text-Only (Reversed) Lyrics Mode --- */
+body.lyrics-mode-text-only-reversed .container {
+    opacity: 0;
+    pointer-events: none;
+}
+body.lyrics-mode-text-only-reversed #lyrics-container {
+    width: 100vw;
+    height: 100vh;
+    left: 0;
+    right: 0;
+    align-items: center; 
+    padding: 2rem 5vw;
+}
+body.lyrics-mode-text-only-reversed .lyrics-line {
+    align-items: center;
+    transform-origin: center center;
+    flex-direction: column-reverse; /* Reverse the order */
+}
+body.lyrics-mode-text-only-reversed .original-lyric,
+body.lyrics-mode-text-only-reversed .translated-lyric {
+    text-align: center;
+}
+/* Style the reversed text */
+body.lyrics-mode-text-only-reversed .translated-lyric {
+    font-size: 4.0rem;
+    opacity: 1;
+}
+body.lyrics-mode-text-only-reversed .original-lyric {
+    font-size: 2.2rem;
+    opacity: 0.8;
+}
+/* Handle lines with no translation by showing original in full size */
+body.lyrics-mode-text-only-reversed .lyrics-line:has(.translated-lyric:empty) {
+    flex-direction: column;
+    justify-content: center;
+}
+body.lyrics-mode-text-only-reversed .lyrics-line:has(.translated-lyric:empty) .original-lyric {
+    font-size: 4.0rem;
+    opacity: 1;
 }
