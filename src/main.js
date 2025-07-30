@@ -47,8 +47,6 @@ const italicOriginalToggle = document.getElementById('italic-original-toggle');
 const italicTranslationToggle = document.getElementById('italic-translation-toggle');
 const opacityRange = document.getElementById('lyrics-opacity-range');
 const textShadowToggle = document.getElementById('text-shadow-toggle'); // NEW: Get the shadow toggle element
-// NEW: Add the text-only font size slider
-const textOnlyFontSizeRange = document.getElementById('text-only-font-size-range');
 // NEW: Get new control elements
 const adaptiveColorToggle = document.getElementById('adaptive-color-toggle');
 const customColorPicker = document.getElementById('custom-color-picker');
@@ -196,14 +194,6 @@ function applyTextShadow(isEnabled) {
         ? '0 1px 8px rgba(0, 0, 0, 0.7)' 
         : 'none';
     document.documentElement.style.setProperty('--adaptive-text-shadow', shadowStyle);
-}
-
-/**
- * Applies text-only mode font size from the slider.
- * @param {number} value - The font size in pixels.
- */
-function applyTextOnlyFontSize(value) {
-    document.documentElement.style.setProperty('--text-only-font-size', `${value}px`);
 }
 
 /**
@@ -395,13 +385,6 @@ function setupSettings() {
         applyTextShadow(isEnabled);
     });
 
-    // NEW: Text-only font size listener
-    textOnlyFontSizeRange.addEventListener('input', () => {
-        const value = parseInt(textOnlyFontSizeRange.value, 10);
-        localStorage.setItem('textOnlyFontSize', value.toString());
-        applyTextOnlyFontSize(value);
-    });
-
     // NEW: Adaptive color and custom color listeners
     adaptiveColorToggle.addEventListener('change', () => {
         const isEnabled = adaptiveColorToggle.checked;
@@ -467,15 +450,6 @@ function setupSettings() {
     textShadowToggle.checked = savedTextShadow;
     applyTextShadow(savedTextShadow);
     
-    // NEW: Restore text-only font size
-    const savedTextOnlySize = parseInt(localStorage.getItem('textOnlyFontSize'), 10);
-    if (!isNaN(savedTextOnlySize)) {
-        textOnlyFontSizeRange.value = savedTextOnlySize;
-        applyTextOnlyFontSize(savedTextOnlySize);
-    } else {
-        applyTextOnlyFontSize(40); // Default size
-    }
-
     // NEW: Restore adaptive color, custom color, and text opacity
     const savedAdaptiveEnabled = localStorage.getItem('adaptiveColorEnabled') !== '0'; // Default to true
     adaptiveColorToggle.checked = savedAdaptiveEnabled;
@@ -512,6 +486,8 @@ function setupSettings() {
     
     // Initial UI update for background controls
     updateBackgrounds();
+    // 根据当前自适应/自定义选项立即应用文本颜色
+    updateAdaptiveColors();
 }
 
 /**
@@ -810,7 +786,14 @@ async function handleFile(filePath) {
             artworkUrl = `data:${mimeType};base64,${result.albumArtBase64}`;
             albumArt.src = artworkUrl;
             albumArt.style.display = 'block';
-            analyzeImageAndApplyColors(artworkUrl);
+            // 根据用户设置决定是否启用自适应颜色分析
+            if (adaptiveColorToggle.checked) {
+                // 自适应颜色已启用，分析封面颜色并应用
+                analyzeImageAndApplyColors(artworkUrl);
+            } else {
+                // 使用自定义颜色，重新应用
+                updateAdaptiveColors();
+            }
         } else {
             // No artwork found.
             artworkUrl = '';
