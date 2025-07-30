@@ -30,6 +30,7 @@
     --info-text-opacity: 1; /* NEW: 标题/歌手不透明度 */
     --font-interface: 'Inter', sans-serif; /* NEW: 界面字体 */
     --bg-blur-radius: 50px; /* NEW: 背景模糊半径 */
+    --text-only-font-size: 40px; /* NEW: Default text-only font size */
 
     /* 分离原文/译文字重 */
     --lyrics-font-weight-original: 700;   /* 默认原文加粗 */
@@ -1293,6 +1294,20 @@ body.lyrics-mode-text-only .translated-lyric {
     text-align: center;
 }
 
+/* NEW: Apply font size from variable */
+body.lyrics-mode-text-only .original-lyric {
+    font-size: var(--text-only-font-size);
+}
+
+body.lyrics-mode-text-only .translated-lyric {
+    /* Maintain a proportional size for the translation */
+    font-size: calc(var(--text-only-font-size) * 0.55);
+}
+
+body.lyrics-mode-text-only .lyrics-line:has(.translated-lyric:empty) .original-lyric {
+    font-size: var(--text-only-font-size);
+}
+
 
 .indicator-content {
     display: flex;
@@ -1379,11 +1394,11 @@ body.lyrics-mode-text-only-reversed .translated-lyric {
 }
 /* Style the reversed text */
 body.lyrics-mode-text-only-reversed .translated-lyric {
-    font-size: 4.0rem;
+    font-size: var(--text-only-font-size);
     opacity: 1;
 }
 body.lyrics-mode-text-only-reversed .original-lyric {
-    font-size: 2.2rem;
+    font-size: calc(var(--text-only-font-size) * 0.55);
     opacity: 0.8;
 }
 /* Handle lines with no translation by showing original in full size */
@@ -1392,6 +1407,6 @@ body.lyrics-mode-text-only-reversed .lyrics-line:has(.translated-lyric:empty) {
     justify-content: center;
 }
 body.lyrics-mode-text-only-reversed .lyrics-line:has(.translated-lyric:empty) .original-lyric {
-    font-size: 4.0rem;
+    font-size: var(--text-only-font-size);
     opacity: 1;
 }
