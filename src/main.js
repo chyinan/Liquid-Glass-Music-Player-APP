@@ -61,7 +61,9 @@ const bgBlurRange = document.getElementById('bg-blur-range');
 const backgroundVideo = document.getElementById('background-video');
 const customBgVideoBtn = document.getElementById('custom-bg-video-btn');
 const clearCustomBgBtn = document.getElementById('clear-custom-bg-btn');
-
+// NEW: Cover Mode Elements
+const coverModeLyricsContainer = document.getElementById('cover-mode-lyrics-container');
+const coverModeLyrics = document.getElementById('cover-mode-lyrics');
 
 /**
  * Wrap ASCII/latin sequences with span.latin so他们使用英文字体
@@ -952,39 +954,45 @@ window.addEventListener('keydown', (event) => {
                 }
                 break;
         case 'l':
-            // 在进入歌词模式前，如果极简模式是激活的，则先退出极简模式
-            if (playerUIGlass.classList.contains('minimal-mode')) {
+            // 在进入歌词模式前，如果极简/封面模式是激活的，则先退出
+            if (playerUIGlass.classList.contains('minimal-mode') || document.body.classList.contains('cover-mode')) {
                 playerUIGlass.classList.remove('minimal-mode');
+                document.body.classList.remove('cover-mode');
+                coverModeLyricsContainer.classList.add('hidden');
                 container.classList.remove('minimal-active');
                 playerWrapper.classList.remove('minimal-active');
             }
             toggleLyrics();
             break;
             case 'v':
-            // 在进入极简模式前，如果歌词模式处于激活状态，则强制先完全关闭歌词模式
-            if (lyricsDisplayMode !== 0) {
-                /*
-                 * FIX: To turn lyrics off in one go, we must set the mode
-                 * to whichever state precedes 'off' (0) in the cycle.
-                 * This now depends on whether a translation is available.
-                 */
-                const metaRegex = /(作[词詞]|作曲|编曲|編曲|詞|曲|译|arranger|composer|lyricist|lyrics|ti|ar|al|by)/i;
-                const hasTranslation = parsedLyrics.some(l => l.translation && !metaRegex.test(l.text));
+                // 在切换视图模式前，如果歌词模式处于激活状态，则强制先完全关闭歌词模式
+                if (lyricsDisplayMode !== 0) {
+                    const metaRegex = /(作[词詞]|作曲|编曲|編曲|詞|曲|译|arranger|composer|lyricist|lyrics|ti|ar|al|by)/i;
+                    const hasTranslation = parsedLyrics.some(l => l.translation && !metaRegex.test(l.text));
+                    lyricsDisplayMode = hasTranslation ? 6 : 5; // 设置为关闭(0)之前的那个模式
+                    toggleLyrics();
+                }
 
-                // Set to the mode that will cycle to 0. It's 6 if translation exists, otherwise 5.
-                lyricsDisplayMode = hasTranslation ? 6 : 5;
-                toggleLyrics();
-            }
-            // 切换极简模式
-            const minimalActive = playerUIGlass.classList.toggle('minimal-mode');
+                const isMinimal = playerUIGlass.classList.contains('minimal-mode');
+                const isCover = document.body.classList.contains('cover-mode');
 
-            // 兼容不支持 :has() 选择器的浏览器，手动给容器和 wrapper 加备份类
-            if (minimalActive) {
-                container.classList.add('minimal-active');
+                if (!isMinimal && !isCover) {
+                    // 从 普通 -> 极简
+                    playerUIGlass.classList.add('minimal-mode');
+                    container.classList.add('minimal-active'); // for non-:has() browsers
                     playerWrapper.classList.add('minimal-active');
-                } else {
-                container.classList.remove('minimal-active');
+                } else if (isMinimal) {
+                    // 从 极简 -> 封面
+                    playerUIGlass.classList.remove('minimal-mode');
+                    container.classList.remove('minimal-active');
                     playerWrapper.classList.remove('minimal-active');
+                    document.body.classList.add('cover-mode');
+                    coverModeLyricsContainer.classList.remove('hidden');
+                    updateLyrics(audioPlayer.currentTime, true); // 强制刷新歌词
+                } else { // isCover
+                    // 从 封面 -> 普通
+                    document.body.classList.remove('cover-mode');
+                    coverModeLyricsContainer.classList.add('hidden');
                 }
                 break;
         }
@@ -1032,12 +1040,28 @@ function resetPlayerUI() {
     lyricsLinesContainer.innerHTML = '';
     noLyricsMessage.classList.add('hidden');
     currentLyricIndex = -1;
-    document.body.classList.remove('lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 'lyrics-mode-bilingual-reversed', 'lyrics-mode-original', 'lyrics-mode-text-only', 'lyrics-mode-text-only-reversed');
+    document.body.classList.remove(
+        'lyrics-active', 'lyrics-mode-translation', 'lyrics-mode-bilingual', 
+        'lyrics-mode-bilingual-reversed', 'lyrics-mode-original', 'lyrics-mode-text-only', 
+        'lyrics-mode-text-only-reversed', 'cover-mode'
+    );
     lyricsContainer.classList.add('hidden');
+    coverModeLyricsContainer.classList.add('hidden');
+    coverModeLyrics.innerHTML = '';
     lyricsDisplayMode = 0; // Reset mode to off
 }
 
 function toggleLyrics() {
+    // NEW: Exit cover mode if active before entering lyrics mode
+    if (document.body.classList.contains('cover-mode')) {
+        document.body.classList.remove('cover-mode');
+        coverModeLyricsContainer.classList.add('hidden');
+        // If we exit cover mode via 'L', we should go back to normal, not minimal.
+        playerUIGlass.classList.remove('minimal-mode');
+        container.classList.remove('minimal-active');
+        playerWrapper.classList.remove('minimal-active');
+    }
+
     // NEW: Define regex here to check for metadata lines like '作词', '作曲', '译' etc.
     const metaRegex = /(作[词詞]|作曲|编曲|編曲|詞|曲|译|arranger|composer|lyricist|lyrics|ti|ar|al|by)/i;
     // UPDATED: A song is considered to have translations only if there's at least one
@@ -1283,7 +1307,44 @@ function updateLyrics(currentTime, forceRecalc = false) {
                 }
             }
         }
+        
+        // NEW: Update cover mode lyrics
+        if (document.body.classList.contains('cover-mode')) {
+            const currentLineData = parsedLyrics[currentLyricIndex];
+            if (currentLineData) {
+                let finalHTML = '';
+                // Build original lyric span
+                const originalText = currentLineData.text || '';
+                if (originalText) {
+                    const lang = detectLang(originalText);
+                    finalHTML += `<span class="original-lyric" lang="${lang}">${wrapEnglish(fixProblemGlyphs(originalText))}</span>`;
+                }
+                // Build translated lyric span if it exists
+                const translatedText = currentLineData.translation || '';
+                if (translatedText) {
+                    const lang = detectLang(translatedText); // Usually Chinese
+                    finalHTML += `<span class="translated-lyric" lang="${lang}">${wrapEnglish(fixProblemGlyphs(translatedText))}</span>`;
+                }
+                
+                coverModeLyrics.innerHTML = finalHTML;
+
+            } else {
+                coverModeLyrics.innerHTML = '';
+            }
+        }
     }
+}
+
+/** NEW utility function to avoid code repetition */
+function detectLang(text) {
+    let lang = 'en'; // Default lang
+    const langCode = franc(text, { minLength: 1 });
+    if (langCode === 'cmn' || langCode === 'nan') {
+        lang = 'zh-CN';
+    } else if (langCode === 'jpn') {
+        lang = 'ja';
+    }
+    return lang;
 }
 
 // --- 新增函数 ---
@@ -1547,4 +1608,3 @@ function getLocalizedFontName(name) {
     }
     return name;
 }
-

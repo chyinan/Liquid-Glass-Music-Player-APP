@@ -499,13 +499,13 @@ input[type="file"] { display: none; }
 /* Override wrapper constraints in minimal mode */
 #player-wrapper:has(#player-ui-glass.minimal-mode) {
     max-width: none;
-    width: auto;
+    width: 90vw;
 }
 
 /* Backup for browsers that don't support :has() */
 #player-wrapper.minimal-active {
     max-width: none !important;
-    width: auto !important;
+    width: 90vw !important;
 }
 
 #player-ui-distorted-bg {
@@ -526,6 +526,7 @@ input[type="file"] { display: none; }
     perspective: 1000px;
     
     /* Animation is now MOVED to minimal-mode specific rule */
+    transition: opacity 0.5s ease-in-out;
 }
 
 /* --- Liquid Glass Player UI (Adjusted) --- */
@@ -1402,4 +1403,95 @@ body.lyrics-mode-text-only-reversed .lyrics-line:has(.translated-lyric:empty) {
 body.lyrics-mode-text-only-reversed .lyrics-line:has(.translated-lyric:empty) .original-lyric {
     font-size: 4.0rem;
     opacity: 1;
+}
+
+/* --- NEW: Cover Mode --- */
+#cover-mode-lyrics-container {
+    position: fixed;
+    bottom: 4.8vh;
+    left: 0;
+    width: 100%;
+    padding: 0 5vw;
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.5s ease-in-out;
+}
+
+#cover-mode-lyrics {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--adaptive-text-color);
+    text-shadow: var(--adaptive-text-shadow);
+    opacity: var(--info-text-opacity);
+    transition: color 0.8s ease-in-out, text-shadow 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+#cover-mode-lyrics .original-lyric {
+    font-size: 2.8rem;
+    font-weight: var(--lyrics-font-weight-original, 700);
+    font-style: var(--lyrics-font-style-original, normal);
+    opacity: 1;
+    padding-left: 0;
+}
+
+#cover-mode-lyrics .translated-lyric {
+    font-size: 2.0rem;
+    font-weight: var(--lyrics-font-weight-translation, 400);
+    font-style: var(--lyrics-font-style-translation, normal);
+    opacity: 0.85;
+    padding-left: 0;
+}
+
+/* NEW: Enlarge font size when there is only one line of lyrics in cover mode */
+#cover-mode-lyrics .original-lyric:only-child,
+#cover-mode-lyrics .translated-lyric:only-child {
+    font-size: 3.2rem;
+}
+
+body.cover-mode .container {
+    align-items: center;
+    justify-content: center;
+}
+
+body.cover-mode #player-ui-distorted-bg {
+    opacity: 0;
+}
+
+body.cover-mode #player-wrapper {
+    width: 70vmin; /* Responsive based on viewport smaller dimension */
+    height: 70vmin;
+    max-width: none;
+    max-height: none;
+    border-radius: 16px;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+body.cover-mode #player-ui-glass {
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+    border-radius: 16px;
+    height: 100%;
+}
+
+body.cover-mode #visual-container {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border-radius: 16px;
+}
+
+body.cover-mode #visual-container img {
+    border-radius: 16px;
+}
+
+body.cover-mode #info-wrapper {
+    display: none;
 }
