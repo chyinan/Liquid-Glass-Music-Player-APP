@@ -2,68 +2,76 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
-// NEW: Import shell.open from plugin-shell to launch default system browser
+// Import shell.open from plugin-shell to launch default system browser
 import { open as openInBrowser } from '@tauri-apps/plugin-shell';
-// NEW: 引入语言识别库
+// 引入语言识别库
 import { franc } from 'franc';
 
-// DOM Elements
+// ===== DOM ELEMENTS =====
+
+// Main Layout Elements
 const container = document.querySelector('.container');
-    const fileSelectContainer = document.querySelector('.file-select-container');
-    const playerWrapper = document.getElementById('player-wrapper');
-    const distortedBg = document.getElementById('player-ui-distorted-bg');
-    const playerUIGlass = document.getElementById('player-ui-glass');
-    const visualContainer = document.getElementById('visual-container');
+const fileSelectContainer = document.querySelector('.file-select-container');
+const playerWrapper = document.getElementById('player-wrapper');
+const distortedBg = document.getElementById('player-ui-distorted-bg');
+const playerUIGlass = document.getElementById('player-ui-glass');
+const visualContainer = document.getElementById('visual-container');
+const loadingOverlay = document.getElementById('loadingOverlay');
 
+// Background Elements
 const backgroundBlur = document.getElementById('background-blur');
-const loadBtn = document.getElementById('loadBtn');
+const backgroundVideo = document.getElementById('background-video');
+
+// Audio Player Elements
 const audioPlayer = document.getElementById('audioPlayer');
-    
-    const albumArt = document.getElementById('albumArt');
-    const artistNameEl = document.getElementById('artistName');
-    const songTitleEl = document.getElementById('songTitle');
+const loadBtn = document.getElementById('loadBtn');
+const albumArt = document.getElementById('albumArt');
+const artistNameEl = document.getElementById('artistName');
+const songTitleEl = document.getElementById('songTitle');
+const progressBarContainer = document.getElementById('progress-bar-container');
+const progressBarFill = document.getElementById('progress-bar-fill');
+const currentTimeEl = document.getElementById('current-time');
+const durationEl = document.getElementById('duration');
 
-    const progressBarContainer = document.getElementById('progress-bar-container');
-    const progressBarFill = document.getElementById('progress-bar-fill');
-    const currentTimeEl = document.getElementById('current-time');
-    const durationEl = document.getElementById('duration');
-    
-    const loadingOverlay = document.getElementById('loadingOverlay');
-
+// Lyrics Elements
 const lyricsContainer = document.getElementById('lyrics-container');
 const lyricsLinesContainer = document.getElementById('lyrics-lines');
 const noLyricsMessage = document.getElementById('no-lyrics-message');
-// NEW: Settings Elements
+const coverModeLyricsContainer = document.getElementById('cover-mode-lyrics-container');
+const coverModeLyrics = document.getElementById('cover-mode-lyrics');
+
+// Settings Panel Elements
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsPanel = document.getElementById('settingsPanel');
-const githubLink = document.getElementById('githubLink'); // Get the GitHub link element
-// NEW: 更新为新的选择器ID
+const githubLink = document.getElementById('githubLink');
+
+// Font Selection Elements
 const fontChineseSelect = document.getElementById('font-chinese-select');
 const fontJapaneseSelect = document.getElementById('font-japanese-select');
 const fontEnglishSelect = document.getElementById('font-english-select');
+const fontInterfaceSelect = document.getElementById('font-interface-select');
+
+// Style Control Elements
 const boldOriginalToggle = document.getElementById('bold-original-toggle');
 const boldTranslationToggle = document.getElementById('bold-translation-toggle');
 const italicOriginalToggle = document.getElementById('italic-original-toggle');
 const italicTranslationToggle = document.getElementById('italic-translation-toggle');
 const opacityRange = document.getElementById('lyrics-opacity-range');
-const textShadowToggle = document.getElementById('text-shadow-toggle'); // NEW: Get the shadow toggle element
-// NEW: Get new control elements
+const textShadowToggle = document.getElementById('text-shadow-toggle');
+
+// Color Control Elements
 const adaptiveColorToggle = document.getElementById('adaptive-color-toggle');
 const customColorPicker = document.getElementById('custom-color-picker');
 const customColorContainer = document.getElementById('custom-color-container');
 const textOpacityRange = document.getElementById('text-opacity-range');
-const fontInterfaceSelect = document.getElementById('font-interface-select');
+
+// Background Control Elements
 const customBgBtn = document.getElementById('custom-bg-btn');
+const customBgVideoBtn = document.getElementById('custom-bg-video-btn');
+const clearCustomBgBtn = document.getElementById('clear-custom-bg-btn');
 const customBgContainer = document.getElementById('custom-bg-container');
 const albumArtBgToggle = document.getElementById('album-art-bg-toggle');
 const bgBlurRange = document.getElementById('bg-blur-range');
-// NEW: Get the video background element and the new buttons
-const backgroundVideo = document.getElementById('background-video');
-const customBgVideoBtn = document.getElementById('custom-bg-video-btn');
-const clearCustomBgBtn = document.getElementById('clear-custom-bg-btn');
-// NEW: Cover Mode Elements
-const coverModeLyricsContainer = document.getElementById('cover-mode-lyrics-container');
-const coverModeLyrics = document.getElementById('cover-mode-lyrics');
 
 /**
  * Wrap ASCII/latin sequences with span.latin so他们使用英文字体
@@ -85,17 +93,13 @@ function wrapEnglish(text) {
 loadingOverlay.classList.add('ui-hidden');
 
 // State
-    let isPlaying = false;
     let isSeeking = false;
     let artworkUrl = null;
-// NEW: 当前正在播放的临时缓存文件路径，用于后续删除
+// 当前正在播放的临时缓存文件路径，用于后续删除
 let currentAudioCachePath = null;
-// This old variable was causing the issue. It's now removed.
 let parsedLyrics = [];
 let currentLyricIndex = -1;
-// NEW: State for lyrics display mode
-// 0: off, 1: translation only, 2: bilingual (orig/trans), 3: bilingual-reversed (trans/orig), 4: original only, 5: text only
-// NEW: Add mode 6 for text-only-reversed
+// State for lyrics display mode
 // 0: off, 1: translation only, 2: bilingual (orig/trans), 3: bilingual-reversed (trans/orig), 4: original only, 5: text only, 6: text only (reversed)
 let lyricsDisplayMode = 0;
 
@@ -132,7 +136,7 @@ async function applySelectedFonts() {
         zh: fontChineseSelect,
         ja: fontJapaneseSelect,
         en: fontEnglishSelect,
-        interface: fontInterfaceSelect, // NEW: Add interface font
+        interface: fontInterfaceSelect,
     };
 
     for (const [type, selectElement] of Object.entries(fontSelectors)) {
@@ -238,9 +242,9 @@ function populateFontSelectors(categorizedFonts) {
                 option.value = name;
                 // Use localized display name when available
                 option.textContent = getLocalizedFontName(name);
-                // NEW: Render each option using its own font family for live preview
+                // Render each option using its own font family for live preview
                 option.style.fontFamily = `'${name}', sans-serif`;
-                // Optional: Slightly larger font size for better visibility
+                // Slightly larger font size for better visibility
                 option.style.fontSize = '16px';
                 optgroup.appendChild(option);
             });
@@ -251,7 +255,7 @@ function populateFontSelectors(categorizedFonts) {
     populateWithGroups(fontChineseSelect);
     populateWithGroups(fontJapaneseSelect);
     populateWithGroups(fontEnglishSelect);
-    populateWithGroups(fontInterfaceSelect); // NEW: Populate interface font selector
+            populateWithGroups(fontInterfaceSelect);
 }
 
 async function loadAndPopulateFonts() {
@@ -260,26 +264,19 @@ async function loadAndPopulateFonts() {
         populateFontSelectors(categorizedFonts);
         
         // Restore saved font preferences after populating
-        const savedZhFont = localStorage.getItem('font-zh');
-        const savedJaFont = localStorage.getItem('font-ja');
-        const savedEnFont = localStorage.getItem('font-en');
-        const savedInterfaceFont = localStorage.getItem('font-interface'); // NEW: Restore interface font
+        const fontRestoreMap = {
+            zh: { selector: fontChineseSelect, storage: 'font-zh' },
+            ja: { selector: fontJapaneseSelect, storage: 'font-ja' },
+            en: { selector: fontEnglishSelect, storage: 'font-en' },
+            interface: { selector: fontInterfaceSelect, storage: 'font-interface' }
+        };
 
-        if (savedZhFont) {
-            fontChineseSelect.value = savedZhFont;
-            updateFontVariable('--font-zh', savedZhFont);
-        }
-        if (savedJaFont) {
-            fontJapaneseSelect.value = savedJaFont;
-            updateFontVariable('--font-ja', savedJaFont);
-        }
-        if (savedEnFont) {
-            fontEnglishSelect.value = savedEnFont;
-            updateFontVariable('--font-en', savedEnFont);
-        }
-        if (savedInterfaceFont) { // NEW: Apply restored interface font
-            fontInterfaceSelect.value = savedInterfaceFont;
-            updateFontVariable('--font-interface', savedInterfaceFont);
+        for (const [type, config] of Object.entries(fontRestoreMap)) {
+            const savedFont = localStorage.getItem(config.storage);
+            if (savedFont) {
+                config.selector.value = savedFont;
+                await applyFontType(type, savedFont);
+            }
         }
 
     } catch (error) {
@@ -287,42 +284,50 @@ async function loadAndPopulateFonts() {
     }
 }
 
-function updateFontVariable(variable, fontName) {
+/**
+ * Apply font for a specific type (zh, ja, en, interface)
+ * Unified function that handles font application and storage
+ */
+async function applyFontType(type, fontName) {
+    const storageKey = `font-${type}`;
+    
     if (fontName) {
-        document.documentElement.style.setProperty(variable, `'${fontName}', sans-serif`);
-    } else {
-        // Revert to default
-        if (variable === '--font-interface') {
-            document.documentElement.style.setProperty(variable, "'Inter', sans-serif");
-        } else {
-            document.documentElement.style.removeProperty(variable);
+        try {
+            // Store the preference
+            localStorage.setItem(storageKey, fontName);
+            
+            // Get font data and inject it
+            const fontDataB64 = await invoke('get_font_data', { fontName });
+            const dynamicFontName = `dynamic-font-${type}`;
+            injectFontFace(fontDataB64, dynamicFontName);
+            
+            // Apply the dynamic font
+            document.documentElement.style.setProperty(`--font-${type}`, `'${dynamicFontName}'`);
+        } catch (error) {
+            console.error(`Failed to load font ${fontName}:`, error);
+            // Fallback to sans-serif
+            document.documentElement.style.setProperty(`--font-${type}`, 'sans-serif');
         }
+    } else {
+        // Remove stored preference and revert to default
+        localStorage.removeItem(storageKey);
+        const defaultFont = type === 'interface' ? "'Inter', sans-serif" : 'sans-serif';
+        document.documentElement.style.setProperty(`--font-${type}`, defaultFont);
     }
 }
 
-// Event Listeners for font selection
-fontChineseSelect.addEventListener('change', (e) => {
-    const fontName = e.target.value;
-    localStorage.setItem('font-zh', fontName);
-    updateFontVariable('--font-zh', fontName);
-});
+// Unified event listeners for font selection
+const fontSelectorMap = {
+    'zh': fontChineseSelect,
+    'ja': fontJapaneseSelect, 
+    'en': fontEnglishSelect,
+    'interface': fontInterfaceSelect
+};
 
-fontJapaneseSelect.addEventListener('change', (e) => {
-    const fontName = e.target.value;
-    localStorage.setItem('font-ja', fontName);
-    updateFontVariable('--font-ja', fontName);
-});
-
-fontEnglishSelect.addEventListener('change', (e) => {
-    const fontName = e.target.value;
-    localStorage.setItem('font-en', fontName);
-    updateFontVariable('--font-en', fontName);
-});
-
-fontInterfaceSelect.addEventListener('change', (e) => { // NEW: Interface font listener
-    const fontName = e.target.value;
-    localStorage.setItem('font-interface', fontName);
-    updateFontVariable('--font-interface', fontName);
+Object.entries(fontSelectorMap).forEach(([type, selector]) => {
+    selector.addEventListener('change', async (e) => {
+        await applyFontType(type, e.target.value);
+    });
 });
 
 /**
@@ -339,21 +344,7 @@ function setupSettings() {
         }
     });
 
-    // 下拉变更事件
-    const onChange = async () => {
-        // NEW: 保存到新的本地存储键名
-        localStorage.setItem('lyricsFontChinese', fontChineseSelect.value);
-        localStorage.setItem('lyricsFontJapanese', fontJapaneseSelect.value);
-        localStorage.setItem('lyricsFontEnglish', fontEnglishSelect.value);
-        localStorage.setItem('fontInterface', fontInterfaceSelect.value); // NEW: Save interface font
-        await applySelectedFonts();
-    };
-
-    // NEW: 监听新的下拉框
-    fontChineseSelect.addEventListener('change', onChange);
-    fontJapaneseSelect.addEventListener('change', onChange);
-    fontEnglishSelect.addEventListener('change', onChange);
-    fontInterfaceSelect.addEventListener('change', onChange); // NEW: Add listener for interface font
+    // Note: Font selection event listeners are now handled globally above in fontSelectorMap
 
     // Bold toggle listeners
     const onBoldChange = () => {
@@ -544,32 +535,13 @@ function updateBackgrounds() {
 }
 
 /**
- * Sets a custom background image.
- * @param {string} url - The URL of the image to set.
+ * Removes all custom backgrounds (both image and video) and updates the display.
+ * This function now uses the centralized updateBackgrounds() logic.
  */
-function setCustomBackground(url) {
-    backgroundBlur.style.backgroundImage = `url(${url})`;
-    // Note: distortedBg is NOT set here. It should always reflect the current album art.
-    backgroundBlur.classList.add('active');
-    // Save the path for persistence -- THIS WAS THE BUG. The caller now handles saving the raw path.
-    // localStorage.setItem('customBgPath', url);
-}
-
-/**
- * Removes the custom background and reverts to the default (album art).
- */
-function removeCustomBackground() {
+function clearCustomBackground() {
     localStorage.removeItem('customBgPath');
-    // If a song is loaded, revert to its artwork, otherwise clear.
-    if (artworkUrl) {
-        backgroundBlur.style.backgroundImage = `url(${artworkUrl})`;
-        distortedBg.style.backgroundImage = `url(${artworkUrl})`;
-        backgroundBlur.classList.add('active');
-    } else {
-        backgroundBlur.style.backgroundImage = 'none';
-        distortedBg.style.backgroundImage = 'none';
-        backgroundBlur.classList.remove('active');
-    }
+    localStorage.removeItem('customBgVideoPath');
+    updateBackgrounds(); // Use centralized logic instead of manual updates
 }
 
 
@@ -638,10 +610,7 @@ function removeCustomBackground() {
         root.setProperty('--adaptive-progress-bg', `rgba(${r},${g},${b},${bgAlpha})`);
     }
 
-    function resetToDefault() {
-        // As requested, default to pure white for better contrast on dark backgrounds.
-        applyAdaptiveColors({ text: '#ffffff' });
-    }
+    // Use white text for better contrast on dark backgrounds
 
     function updateAdaptiveColors() {
         if (adaptiveColorToggle.checked) {
@@ -649,7 +618,7 @@ function removeCustomBackground() {
             if (artworkUrl) {
                 analyzeImageAndApplyColors(artworkUrl);
             } else {
-                resetToDefault();
+                applyAdaptiveColors({ text: '#ffffff' });
             }
         } else {
             // Use the custom color from the picker.
@@ -671,8 +640,7 @@ function removeCustomBackground() {
                 const sample = 1200;
                 let rSum = 0, gSum = 0, bSum = 0;
 
-                // NEW: Sample from a central rectangle in the bottom half of the image,
-                // as requested, to improve accuracy by focusing where text is.
+                // Sample from a central rectangle in the bottom half of the image for better accuracy
                 const sampleXStart = w * 0.25; // Start 25% from the left
                 const sampleWidth = w * 0.5;   // Sample a 50% horizontal slice
                 const sampleYStart = h * 0.55; // Start from 55% down
@@ -700,7 +668,7 @@ function removeCustomBackground() {
         analyzeImage(imageUrl).then((info) => {
             if (!info) {
                 // Fallback to white if analysis fails
-                return resetToDefault();
+                return applyAdaptiveColors({ text: '#ffffff' });
             }
             
             const { r, g, b, luminance } = info;
@@ -709,7 +677,7 @@ function removeCustomBackground() {
             // The threshold was increased from 128 to 140 to be more sensitive
             // to darker backgrounds, ensuring white text is used more appropriately.
             if (luminance < 140) {
-                resetToDefault(); // Uses white text
+                applyAdaptiveColors({ text: '#ffffff' }); // Uses white text
             } else {
                 // If the bottom half is light, find a contrasting dark color.
                 const { h, s, l } = rgbToHsl(r, g, b);
@@ -801,7 +769,7 @@ async function handleFile(filePath) {
             artworkUrl = '';
             albumArt.src = '';
             albumArt.style.display = 'none';
-            resetToDefault();
+            applyAdaptiveColors({ text: '#ffffff' });
         }
 
         // After updating artworkUrl, refresh all backgrounds
@@ -1011,7 +979,7 @@ function resetPlayerUI() {
     audioPlayer.pause();
     audioPlayer.src = '';
 
-    // NEW: When resetting, show the file select screen and global controls again
+            // When resetting, show the file select screen and global controls again
     fileSelectContainer.classList.remove('hidden');
     githubLink.classList.remove('hidden');
     settingsBtn.classList.remove('hidden');
@@ -1052,7 +1020,7 @@ function resetPlayerUI() {
 }
 
 function toggleLyrics() {
-    // NEW: Exit cover mode if active before entering lyrics mode
+    // Exit cover mode if active before entering lyrics mode
     if (document.body.classList.contains('cover-mode')) {
         document.body.classList.remove('cover-mode');
         coverModeLyricsContainer.classList.add('hidden');
@@ -1181,157 +1149,173 @@ function parseLRC(lrcText) {
     return finalLyrics;
 }
 
+/**
+ * Calculate the current lyric index based on current time
+ */
+function calculateCurrentLyricIndex(currentTime) {
+    const firstLaterIdx = parsedLyrics.findIndex(line => line.time > currentTime);
+    if (firstLaterIdx === -1) {
+        // Already past the last lyric line
+        return parsedLyrics.length - 1;
+    } else {
+        const newIndex = firstLaterIdx - 1;
+        return newIndex < 0 ? 0 : newIndex;
+    }
+}
+
+/**
+ * Update DOM elements' position attributes
+ */
+function updateLyricElementPositions(isActive) {
+    const allLines = lyricsLinesContainer.querySelectorAll('.lyrics-line');
+
+    // Reset special states
+    allLines.forEach(line => line.classList.remove('move-up-more'));
+
+    // Set position attributes
+    allLines.forEach(line => {
+        const absIndex = parseInt(line.dataset.absIndex, 10);
+        const relativeIndex = absIndex - currentLyricIndex;
+
+        if (line.classList.contains('skip-line')) {
+            if (relativeIndex === 0 || !isActive || Math.abs(relativeIndex) > 1) {
+                line.classList.remove('skip-line');
+            }
+        }
+        
+        if (line.classList.contains('skip-line')) {
+             delete line.dataset.lineIndex;
+             return;
+        }
+
+        if (isActive && Math.abs(relativeIndex) <= 1) {
+            line.dataset.lineIndex = relativeIndex;
+        } else {
+            delete line.dataset.lineIndex;
+        }
+    });
+
+    // Force layout flush
+    void lyricsLinesContainer.offsetHeight;
+}
+
+/**
+ * Calculate and apply dynamic transforms for lyric positioning
+ */
+function applyLyricTransforms() {
+    const getLineByRelIdx = (idx) => lyricsLinesContainer.querySelector(`.lyrics-line[data-line-index="${idx}"]`);
+    
+    const getScale = (el) => {
+        if (!el) return 0;
+        return parseFloat(getComputedStyle(el).getPropertyValue('--scale'));
+    };
+
+    const line0 = getLineByRelIdx(0);
+    if (!line0) return;
+
+    const baseGap = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2.0; 
+
+    // Set current line's position
+    line0.style.setProperty('--translate-y', '0px');
+    
+    // Calculate positions downwards
+    let lastLine = line0;
+    let lastTranslateY = 0;
+
+    const line1 = getLineByRelIdx(1);
+    if (line1) {
+        const dynamicGap = baseGap + (lastLine.offsetHeight + line1.offsetHeight) * 0.15;
+        const distance = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line1.offsetHeight / 2) * getScale(line1) + dynamicGap;
+        const translateY = lastTranslateY + distance;
+        line1.style.setProperty('--translate-y', `${translateY}px`);
+
+        lastLine = line1;
+        lastTranslateY = translateY;
+        
+        const line2 = getLineByRelIdx(2);
+        if (line2) {
+            const dynamicGap2 = baseGap + (lastLine.offsetHeight + line2.offsetHeight) * 0.15;
+            const distance2 = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line2.offsetHeight / 2) * getScale(line2) + dynamicGap2;
+            const translateY2 = lastTranslateY + distance2;
+            line2.style.setProperty('--translate-y', `${translateY2}px`);
+        }
+    }
+
+    // Calculate positions upwards
+    lastLine = line0;
+    lastTranslateY = 0;
+
+    const line_minus_1 = getLineByRelIdx(-1);
+    if (line_minus_1) {
+        const dynamicGap = baseGap + (lastLine.offsetHeight + line_minus_1.offsetHeight) * 0.15;
+        const distance = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line_minus_1.offsetHeight / 2) * getScale(line_minus_1) + dynamicGap;
+        const translateY = lastTranslateY - distance;
+        line_minus_1.style.setProperty('--translate-y', `${translateY}px`);
+
+        lastLine = line_minus_1;
+        lastTranslateY = translateY;
+
+        const line_minus_2 = getLineByRelIdx(-2);
+        if (line_minus_2) {
+            const dynamicGap2 = baseGap + (lastLine.offsetHeight + line_minus_2.offsetHeight) * 0.15;
+            const distance2 = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line_minus_2.offsetHeight / 2) * getScale(line_minus_2) + dynamicGap2;
+            const translateY2 = lastTranslateY - distance2;
+            line_minus_2.style.setProperty('--translate-y', `${translateY2}px`);
+        }
+    }
+}
+
+/**
+ * Update cover mode lyrics display
+ */
+function updateCoverModeLyrics() {
+    if (!document.body.classList.contains('cover-mode')) return;
+    
+    const currentLineData = parsedLyrics[currentLyricIndex];
+    if (currentLineData) {
+        let finalHTML = '';
+        // Build original lyric span
+        const originalText = currentLineData.text || '';
+        if (originalText) {
+            const lang = detectLang(originalText);
+            finalHTML += `<span class="original-lyric" lang="${lang}">${wrapEnglish(fixProblemGlyphs(originalText))}</span>`;
+        }
+        // Build translated lyric span if it exists
+        const translatedText = currentLineData.translation || '';
+        if (translatedText) {
+            const lang = detectLang(translatedText);
+            finalHTML += `<span class="translated-lyric" lang="${lang}">${wrapEnglish(fixProblemGlyphs(translatedText))}</span>`;
+        }
+        
+        coverModeLyrics.innerHTML = finalHTML;
+    } else {
+        coverModeLyrics.innerHTML = '';
+    }
+}
+
 function updateLyrics(currentTime, forceRecalc = false) {
     if (parsedLyrics.length === 0) {
         return;
     }
 
-    // 计算新索引：找到第一句时间大于 currentTime 的行
-    const firstLaterIdx = parsedLyrics.findIndex(line => line.time > currentTime);
-    let newLyricIndex;
-    if (firstLaterIdx === -1) {
-        // 已经超过最后一句歌词时间，保持在最后一句
-        newLyricIndex = parsedLyrics.length - 1;
-    } else {
-        newLyricIndex = firstLaterIdx - 1;
-        if (newLyricIndex < 0) newLyricIndex = 0;
-    }
+    const newLyricIndex = calculateCurrentLyricIndex(currentTime);
 
     const isActive = lyricsDisplayMode !== 0;
 
-    // The condition should ONLY update the index.
-    // The DOM update logic must run every time to handle mode switches.
+    // Only update when lyric line changes or forced recalculation
     if (forceRecalc || newLyricIndex !== currentLyricIndex) {
         currentLyricIndex = newLyricIndex;
 
-        // --- CORE LOGIC MOVED ---
-        // This entire block now ONLY runs when the lyric line changes,
-        // preventing the high-frequency updates that caused the flickering.
-        
-        const allLines = lyricsLinesContainer.querySelectorAll('.lyrics-line');
+        // Update DOM element positions
+        updateLyricElementPositions(isActive);
 
-        // First, reset any special state from the previous line to prevent flickering.
-        // This is a more robust way to clean up.
-        allLines.forEach(line => line.classList.remove('move-up-more'));
-
-        // === 1. Main Update Loop: Set intended positions ===
-        allLines.forEach(line => {
-            const absIndex = parseInt(line.dataset.absIndex, 10);
-            const relativeIndex = absIndex - currentLyricIndex;
-
-            if (line.classList.contains('skip-line')) {
-                if (relativeIndex === 0 || !isActive || Math.abs(relativeIndex) > 1) {
-                    line.classList.remove('skip-line');
-                }
-            }
-            
-            if (line.classList.contains('skip-line')) {
-                 delete line.dataset.lineIndex;
-                 return;
-            }
-
-            if (isActive && Math.abs(relativeIndex) <= 1) {
-                line.dataset.lineIndex = relativeIndex;
-            } else {
-                delete line.dataset.lineIndex;
-            }
-        });
-
-        // === 2. Force Layout Flush ===
-        void lyricsLinesContainer.offsetHeight;
-
-        // === 3. DYNAMICALLY SET TRANSFORMS (NEW LOGIC) ===
+        // Apply dynamic transforms if lyrics are active
         if (isActive) {
-            const getLineByRelIdx = (idx) => lyricsLinesContainer.querySelector(`.lyrics-line[data-line-index="${idx}"]`);
-            
-            // Utility to get the computed scale for a line
-            const getScale = (el) => {
-                if (!el) return 0;
-                // We can get the CSS variable value.
-                return parseFloat(getComputedStyle(el).getPropertyValue('--scale'));
-            };
-
-            const line0 = getLineByRelIdx(0);
-            if (!line0) return;
-
-            // Define a base gap, reduced for a more pronounced dynamic effect.
-            const baseGap = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2.0; 
-
-            // Set current line's position
-            line0.style.setProperty('--translate-y', '0px');
-            
-            // --- Calculate positions downwards ---
-            let lastLine = line0;
-            let lastTranslateY = 0;
-
-            const line1 = getLineByRelIdx(1);
-            if (line1) {
-                // NEW: Dynamic gap based on the SUM of heights for a stronger effect
-                const dynamicGap = baseGap + (lastLine.offsetHeight + line1.offsetHeight) * 0.15;
-                const distance = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line1.offsetHeight / 2) * getScale(line1) + dynamicGap;
-                const translateY = lastTranslateY + distance;
-                line1.style.setProperty('--translate-y', `${translateY}px`);
-
-                lastLine = line1;
-                lastTranslateY = translateY;
-                
-                const line2 = getLineByRelIdx(2);
-                if (line2) {
-                    const dynamicGap2 = baseGap + (lastLine.offsetHeight + line2.offsetHeight) * 0.15;
-                    const distance2 = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line2.offsetHeight / 2) * getScale(line2) + dynamicGap2;
-                    const translateY2 = lastTranslateY + distance2;
-                    line2.style.setProperty('--translate-y', `${translateY2}px`);
-                }
-            }
-
-            // --- Calculate positions upwards ---
-            lastLine = line0;
-            lastTranslateY = 0;
-
-            const line_minus_1 = getLineByRelIdx(-1);
-            if (line_minus_1) {
-                const dynamicGap = baseGap + (lastLine.offsetHeight + line_minus_1.offsetHeight) * 0.15;
-                const distance = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line_minus_1.offsetHeight / 2) * getScale(line_minus_1) + dynamicGap;
-                const translateY = lastTranslateY - distance;
-                line_minus_1.style.setProperty('--translate-y', `${translateY}px`);
-
-                lastLine = line_minus_1;
-                lastTranslateY = translateY;
-
-                const line_minus_2 = getLineByRelIdx(-2);
-                if (line_minus_2) {
-                    const dynamicGap2 = baseGap + (lastLine.offsetHeight + line_minus_2.offsetHeight) * 0.15;
-                    const distance2 = (lastLine.offsetHeight / 2) * getScale(lastLine) + (line_minus_2.offsetHeight / 2) * getScale(line_minus_2) + dynamicGap2;
-                    const translateY2 = lastTranslateY - distance2;
-                    line_minus_2.style.setProperty('--translate-y', `${translateY2}px`);
-                }
-            }
+            applyLyricTransforms();
         }
         
-        // NEW: Update cover mode lyrics
-        if (document.body.classList.contains('cover-mode')) {
-            const currentLineData = parsedLyrics[currentLyricIndex];
-            if (currentLineData) {
-                let finalHTML = '';
-                // Build original lyric span
-                const originalText = currentLineData.text || '';
-                if (originalText) {
-                    const lang = detectLang(originalText);
-                    finalHTML += `<span class="original-lyric" lang="${lang}">${wrapEnglish(fixProblemGlyphs(originalText))}</span>`;
-                }
-                // Build translated lyric span if it exists
-                const translatedText = currentLineData.translation || '';
-                if (translatedText) {
-                    const lang = detectLang(translatedText); // Usually Chinese
-                    finalHTML += `<span class="translated-lyric" lang="${lang}">${wrapEnglish(fixProblemGlyphs(translatedText))}</span>`;
-                }
-                
-                coverModeLyrics.innerHTML = finalHTML;
-
-            } else {
-                coverModeLyrics.innerHTML = '';
-            }
-        }
+        // Update cover mode display
+        updateCoverModeLyrics();
     }
 }
 
@@ -1482,18 +1466,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // NEW: Listener to clear any custom background
-    clearCustomBgBtn.addEventListener('click', () => {
-        localStorage.removeItem('customBgPath');
-        localStorage.removeItem('customBgVideoPath');
-        updateBackgrounds();
-    });
+    clearCustomBgBtn.addEventListener('click', clearCustomBackground);
 
     // GitHub link click → open in system browser
-    const githubLinkEl = document.getElementById('githubLink');
-    if (githubLinkEl) {
-        githubLinkEl.addEventListener('click', (e) => {
+    if (githubLink) {
+        githubLink.addEventListener('click', (e) => {
             e.preventDefault();
-            const url = githubLinkEl.getAttribute('href');
+            const url = githubLink.getAttribute('href');
             if (window.__TAURI__) {
                 // Use plugin-shell to open URL
                 openInBrowser(url).catch(() => window.open(url, '_blank'));
