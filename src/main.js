@@ -225,19 +225,28 @@ function populateFontSelectors(categorizedFonts) {
     const { zhFonts, jaFonts, enFonts, otherFonts } = categorizedFonts;
 
     const groups = [
-        { label: '中文', list: zhFonts },
-        { label: '日文', list: jaFonts },
-        { label: '英文字体', list: enFonts },
-        { label: '其他', list: otherFonts },
+        { label: '中文', list: zhFonts, lang: 'zh-CN' },
+        { label: '日文', list: jaFonts, lang: 'ja' },
+        { label: '英文字体', list: enFonts, lang: 'en' },
+        { label: '其他', list: otherFonts, lang: 'en' },
     ];
 
     const populateWithGroups = (select) => {
         select.innerHTML = '<option value="">默认</option>';
         groups.forEach(group => {
             if (!group.list || group.list.length === 0) return;
+
+            // Sort the list alphabetically based on the localized name
+            const sortedList = [...group.list].sort((a, b) => {
+                const nameA = getLocalizedFontName(a);
+                const nameB = getLocalizedFontName(b);
+                return nameA.localeCompare(nameB, group.lang, { sensitivity: 'base' });
+            });
+
             const optgroup = document.createElement('optgroup');
             optgroup.label = group.label;
-            group.list.forEach(name => {
+            
+            sortedList.forEach(name => {
                 const option = document.createElement('option');
                 option.value = name;
                 // Use localized display name when available
@@ -255,7 +264,7 @@ function populateFontSelectors(categorizedFonts) {
     populateWithGroups(fontChineseSelect);
     populateWithGroups(fontJapaneseSelect);
     populateWithGroups(fontEnglishSelect);
-            populateWithGroups(fontInterfaceSelect);
+    populateWithGroups(fontInterfaceSelect);
 }
 
 async function loadAndPopulateFonts() {
