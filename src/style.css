@@ -1423,7 +1423,7 @@ body.lyrics-mode-text-only-reversed .lyrics-line:has(.translated-lyric:empty) .o
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
-    color: var(--adaptive-text-color);
+    color: #fff;
     text-shadow: var(--adaptive-text-shadow);
     opacity: var(--info-text-opacity);
     transition: color 0.8s ease-in-out, text-shadow 0.3s ease-in-out, opacity 0.3s ease-in-out;
